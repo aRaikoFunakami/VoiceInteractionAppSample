@@ -16,6 +16,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // third_party/libwebrtc: AAOS Emulator (x86_64) + arm64-v8a devices only.
+        // 32bit not included until a real requirement shows up.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
