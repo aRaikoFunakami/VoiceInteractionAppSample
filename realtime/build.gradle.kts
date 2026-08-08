@@ -21,5 +21,5 @@ android {
 dependencies {
     // Pinned prebuilt Google WebRTC AAR — see third_party/libwebrtc/README.md for why
     // this isn't built from source, and third_party/libwebrtc/VERSION for the pin.
-    api("io.getstream:stream-webrtc-android:1.3.10")
+    api(libs.stream.webrtc.android)
 }

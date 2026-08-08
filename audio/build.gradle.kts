@@ -17,3 +17,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+
+dependencies {
+    // org.webrtc.audio.JavaAudioDeviceModule lives in the same pinned AAR as :realtime.
+    // See third_party/libwebrtc/README.md.
+    api(libs.stream.webrtc.android)
+}
