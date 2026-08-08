@@ -10,6 +10,7 @@ android {
 
     defaultConfig {
         minSdk = 33
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -22,4 +23,9 @@ dependencies {
     api(project(":realtime"))
     api(project(":audio"))
     api(project(":tools"))
+
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.kotlinx.coroutines.android)
 }

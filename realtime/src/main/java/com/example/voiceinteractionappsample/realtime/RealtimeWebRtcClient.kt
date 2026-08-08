@@ -7,11 +7,13 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.webrtc.AudioTrack
 import org.webrtc.DataChannel
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.RTCStatsReport
 import org.webrtc.RtpTransceiver
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
@@ -39,21 +41,32 @@ class RealtimeWebRtcClient(
     private val peerConnectionFactory: PeerConnectionFactory,
     private val credentialProvider: RealtimeCredentialProvider,
 ) {
-    suspend fun connect(observer: PeerConnection.Observer): RealtimeConnection {
+    /**
+     * @param localAudioTrack Captured via WebRtcAudioEngine's AudioDeviceModule — this class
+     *   does not capture audio itself, only wires the track :session hands it (4-1). When
+     *   null (e.g. [RealtimeWebRtcClientLiveTest]), an empty sendrecv audio transceiver is
+     *   still added: OpenAI Realtime rejects an offer with no audio media section at all
+     *   (verified live 2026-08: HTTP 400 invalid_offer "Offer did not have an audio media
+     *   section").
+     */
+    suspend fun connect(
+        observer: PeerConnection.Observer,
+        localAudioTrack: AudioTrack? = null,
+    ): RealtimeConnection {
         val credential = credentialProvider.fetchCredential()
 
         val rtcConfig = PeerConnection.RTCConfiguration(emptyList())
         val peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, observer)
             ?: throw RealtimeConnectionException("createPeerConnection returned null")
 
-        // OpenAI Realtime rejects an offer with no audio media section (verified live,
-        // 2026-08: HTTP 400 invalid_offer "Offer did not have an audio media section").
-        // This only declares the m=audio line as sendrecv; wiring a captured local track
-        // through WebRtcAudioEngine is :session's job (4-1), not this client's.
-        peerConnection.addTransceiver(
-            MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
-            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_RECV),
-        )
+        if (localAudioTrack != null) {
+            peerConnection.addTrack(localAudioTrack)
+        } else {
+            peerConnection.addTransceiver(
+                MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
+                RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_RECV),
+            )
+        }
 
         // The DataChannel must exist before createOffer() for it to end up in the SDP (4節:
         // session.update / conversation / response / function call events all go over this).
@@ -100,6 +113,16 @@ class RealtimeWebRtcClient(
         const val DATA_CHANNEL_LABEL = "oai-events"
     }
 }
+
+/**
+ * WebRTC-level ground truth for "is audio actually flowing" (diagnostics 20節, ticket 4-1):
+ * inbound-rtp audio bytesReceived / outbound-rtp audio bytesSent growing over time is how we
+ * confirm mic capture and assistant playback without a human listening.
+ */
+suspend fun PeerConnection.getStatsSuspend(): RTCStatsReport =
+    suspendCancellableCoroutine { cont ->
+        getStats { report -> cont.resume(report) }
+    }
 
 private suspend fun PeerConnection.createOfferSuspend(): SessionDescription =
     suspendCancellableCoroutine { cont ->
