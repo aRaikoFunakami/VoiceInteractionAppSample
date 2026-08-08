@@ -7,6 +7,7 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.webrtc.DataChannel
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
@@ -16,6 +17,12 @@ import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 
 class RealtimeConnectionException(message: String) : Exception(message)
+
+/** [peerConnection] + the "oai-events" DataChannel (4節, 3-4節), returned together from [RealtimeWebRtcClient.connect]. */
+data class RealtimeConnection(
+    val peerConnection: PeerConnection,
+    val events: RealtimeEventChannel,
+)
 
 /**
  * PeerConnection管理 + SDP offer/answer (4節, 1節).
@@ -32,7 +39,7 @@ class RealtimeWebRtcClient(
     private val peerConnectionFactory: PeerConnectionFactory,
     private val credentialProvider: RealtimeCredentialProvider,
 ) {
-    suspend fun connect(observer: PeerConnection.Observer): PeerConnection {
+    suspend fun connect(observer: PeerConnection.Observer): RealtimeConnection {
         val credential = credentialProvider.fetchCredential()
 
         val rtcConfig = PeerConnection.RTCConfiguration(emptyList())
@@ -48,6 +55,11 @@ class RealtimeWebRtcClient(
             RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_RECV),
         )
 
+        // The DataChannel must exist before createOffer() for it to end up in the SDP (4節:
+        // session.update / conversation / response / function call events all go over this).
+        val dataChannel = peerConnection.createDataChannel(DATA_CHANNEL_LABEL, DataChannel.Init())
+            ?: throw RealtimeConnectionException("createDataChannel returned null")
+
         val offer = peerConnection.createOfferSuspend()
         peerConnection.setLocalDescriptionSuspend(offer)
 
@@ -58,7 +70,7 @@ class RealtimeWebRtcClient(
             SessionDescription(SessionDescription.Type.ANSWER, answerSdp)
         )
 
-        return peerConnection
+        return RealtimeConnection(peerConnection, RealtimeEventChannel(dataChannel))
     }
 
     private fun postOffer(clientSecret: String, offerSdp: String): String {
@@ -85,6 +97,7 @@ class RealtimeWebRtcClient(
 
     private companion object {
         const val REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls"
+        const val DATA_CHANNEL_LABEL = "oai-events"
     }
 }
 

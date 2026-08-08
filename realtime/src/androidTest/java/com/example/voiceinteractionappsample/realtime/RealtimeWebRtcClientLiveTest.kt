@@ -3,7 +3,12 @@ package com.example.voiceinteractionappsample.realtime
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.time.Instant
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeNotNull
 import org.junit.Test
@@ -39,7 +44,8 @@ class RealtimeWebRtcClientLiveTest {
         )
         val client = RealtimeWebRtcClient(factory, credentialProvider)
 
-        val peerConnection = client.connect(NoOpPeerConnectionObserver())
+        val connection = client.connect(NoOpPeerConnectionObserver())
+        val peerConnection = connection.peerConnection
         try {
             assertTrue(
                 "expected a stable signaling state after offer/answer, was ${peerConnection.signalingState()}",
@@ -47,7 +53,23 @@ class RealtimeWebRtcClientLiveTest {
             )
             val remoteSdp = peerConnection.remoteDescription?.description.orEmpty()
             assertTrue("remote SDP answer should look like an SDP body, was: $remoteSdp", remoteSdp.contains("v=0"))
+
+            // 3-4: session.update over "oai-events" and a real reply from OpenAI.
+            withTimeout(10_000) { connection.events.awaitOpen() }
+            connection.events.send(
+                RealtimeEventCodec.encodeSessionUpdate(
+                    JSONObject()
+                        .put("type", "realtime")
+                        .put("output_modalities", JSONArray(listOf("text")))
+                )
+            )
+            val reply = withTimeout(10_000) {
+                connection.events.incoming().map { RealtimeEventCodec.decode(it) }
+                    .first { it.type == "session.updated" || it.type == "error" }
+            }
+            assertTrue("expected session.updated, got ${reply.type}: ${reply.raw}", reply.type == "session.updated")
         } finally {
+            connection.events.close()
             peerConnection.close()
         }
     }
