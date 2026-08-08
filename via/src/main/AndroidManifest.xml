@@ -1,2 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- 1節: VoiceInteractionService は常駐初期化だけ。PeerConnection/HTTP/OpenAI接続/
+             音声処理/tool実行/UI状態機械はここに置かない。 -->
+        <service
+            android:name=".VoiceInteractionServiceImpl"
+            android:label="@string/via_service_label"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+        </service>
+
+        <service
+            android:name=".VoiceInteractionSessionServiceImpl"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true" />
+
+        <!-- AOSP VoiceInteractionServiceInfo.java requires recognitionService to be
+             non-null or the whole VIA registration silently fails to parse (getParseError()).
+             This app's audio path is Realtime WebRTC only; this stub exists ONLY to satisfy
+             that manifest requirement and must never touch the microphone (二重録音防止, 1節). -->
+        <service
+            android:name=".StubRecognitionService"
+            android:permission="android.permission.BIND_RECOGNITION_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+    </application>
+</manifest>
