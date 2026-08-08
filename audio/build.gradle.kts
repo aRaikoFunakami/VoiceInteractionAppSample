@@ -10,6 +10,7 @@ android {
 
     defaultConfig {
         minSdk = 33
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -22,4 +23,8 @@ dependencies {
     // org.webrtc.audio.JavaAudioDeviceModule lives in the same pinned AAR as :realtime.
     // See third_party/libwebrtc/README.md.
     api(libs.stream.webrtc.android)
+
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
 }
