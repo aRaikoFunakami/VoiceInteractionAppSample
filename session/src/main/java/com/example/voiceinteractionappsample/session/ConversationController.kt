@@ -53,7 +53,10 @@ class ConversationController(
     private val credentialProvider: RealtimeCredentialProvider,
     private val vadConfig: RealtimeVadConfig = RealtimeVadConfig(),
     private val aecMode: AecMode = AecMode.AUTO,
+    private val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
 ) : PeerConnection.Observer {
+
+    private var reconnectAttempt = 0
 
     private val _state = MutableStateFlow(ConversationSessionState())
     val state: StateFlow<ConversationSessionState> = _state.asStateFlow()
@@ -178,19 +181,38 @@ class ConversationController(
         audioFocusRequest = null
     }
 
-    // PeerConnection.Observer — feeds ConnectionState from real ICE state (7-1節).
+    // PeerConnection.Observer — feeds ConnectionState from real ICE state (7-1節, 7-3節).
     override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
-        val mapped = when (newState) {
+        when (newState) {
             PeerConnection.IceConnectionState.CONNECTED,
-            PeerConnection.IceConnectionState.COMPLETED -> ConnectionState.CONNECTED
-            PeerConnection.IceConnectionState.DISCONNECTED -> ConnectionState.RECONNECTING
-            PeerConnection.IceConnectionState.FAILED -> ConnectionState.FAILED
-            PeerConnection.IceConnectionState.CLOSED -> ConnectionState.DISCONNECTED
+            PeerConnection.IceConnectionState.COMPLETED -> {
+                reconnectAttempt = 0 // recovered
+                _state.update { it.copy(connection = ConnectionState.CONNECTED) }
+            }
+            PeerConnection.IceConnectionState.DISCONNECTED -> {
+                reconnectAttempt++
+                if (reconnectPolicy.isExhausted(reconnectAttempt)) {
+                    failAndCleanUp()
+                } else {
+                    // Re-negotiating a fresh offer isn't implemented here — this only bounds
+                    // how long a dangling connection stays around before forcing cleanup
+                    // (7-3節: 切断時にaudio captureを残さない). ReconnectPolicy's backoff is the
+                    // documented retry schedule a future reconnect implementation should use.
+                    _state.update { it.copy(connection = ConnectionState.RECONNECTING) }
+                }
+            }
+            PeerConnection.IceConnectionState.FAILED -> failAndCleanUp()
+            PeerConnection.IceConnectionState.CLOSED -> _state.update { it.copy(connection = ConnectionState.DISCONNECTED) }
             PeerConnection.IceConnectionState.CHECKING,
-            PeerConnection.IceConnectionState.NEW -> ConnectionState.CONNECTING
-            else -> return
+            PeerConnection.IceConnectionState.NEW -> _state.update { it.copy(connection = ConnectionState.CONNECTING) }
+            else -> Unit
         }
-        _state.update { it.copy(connection = mapped) }
+    }
+
+    /** 7-3節: FAILEDはaudio captureを残さない — 即座にcancel()と同じ完全クリーンアップを走らせる。 */
+    private fun failAndCleanUp() {
+        _state.update { it.copy(connection = ConnectionState.FAILED) }
+        scope.launch { cancel(DisconnectReason.NETWORK_LOST) }
     }
 
     override fun onSignalingChange(newState: PeerConnection.SignalingState?) = Unit
