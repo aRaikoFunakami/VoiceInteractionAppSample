@@ -7,6 +7,7 @@ import com.example.voiceinteractionappsample.realtime.MockRealtimeCredentialProv
 import com.example.voiceinteractionappsample.realtime.RealtimeConnection
 import com.example.voiceinteractionappsample.realtime.RealtimeEvent
 import com.example.voiceinteractionappsample.realtime.RealtimeEventCodec
+import com.example.voiceinteractionappsample.realtime.RealtimeVadConfig
 import com.example.voiceinteractionappsample.realtime.RealtimeWebRtcClient
 import com.example.voiceinteractionappsample.realtime.WebRtcFactoryProvider
 import java.time.Instant
@@ -30,7 +31,12 @@ import org.webrtc.RtpTransceiver
  */
 object RealtimeLiveTestHarness {
 
-    suspend fun connectWithMic(context: Context, ephemeralSecret: String, aecMode: AecMode = AecMode.AUTO): RealtimeConnection {
+    suspend fun connectWithMic(
+        context: Context,
+        ephemeralSecret: String,
+        aecMode: AecMode = AecMode.AUTO,
+        vadConfig: RealtimeVadConfig = RealtimeVadConfig(),
+    ): RealtimeConnection {
         val audioDeviceModule = WebRtcAudioEngine.create(context, aecMode = aecMode)
         val factory = WebRtcFactoryProvider.create(context, audioDeviceModule)
         val audioSource = factory.createAudioSource(MediaConstraints())
@@ -43,9 +49,7 @@ object RealtimeLiveTestHarness {
         val client = RealtimeWebRtcClient(factory, credentialProvider)
         val connection = client.connect(NoOpObserver(), localTrack)
         withTimeout(10_000) { connection.events.awaitOpen() }
-        connection.events.send(
-            RealtimeEventCodec.encodeSessionUpdate(JSONObject().put("type", "realtime"))
-        )
+        connection.events.send(vadConfig.toSessionUpdateEvent())
         return connection
     }
 

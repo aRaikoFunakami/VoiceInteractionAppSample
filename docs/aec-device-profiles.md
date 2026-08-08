@@ -69,8 +69,14 @@ response開始からわずか480msで発話検出、その35ms後にはresponse�
 段階での割り込みだった。より長く安定して再生している最中の割り込みは今後の課題として残す。
 
 ### Test E — 異なるspeaker route / mic route
-**未実施**。現在の条件（Simulate Insert Headset ON）以外の比較対象が必要
-（Extended Controls > Microphone で "Simulate Insert Headset" をOFFにした状態など）。
+2026-08-08 実施。Test Aと同一手順を "Simulate Insert Headset" ON/OFFの2条件で実行。
+
+| Route条件 | falseTriggerCount | totalEventCount |
+|---|---|---|
+| Simulate Insert Headset ON (Virtual microphone attached) | 0 | 65 |
+| Simulate Insert Headset OFF（デフォルトroute） | 0 | 53 |
+
+両ルートで誤トリガー0件。
 
 ## 未確定事項（19節より）
 AECの合格値そのものは、OEMハードウェア評価前に固定しない。上記はこのAVD/ホスト条件下での
