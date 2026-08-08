@@ -23,6 +23,7 @@ dependencies {
     api(project(":realtime"))
     api(project(":audio"))
     api(project(":tools"))
+    implementation(libs.kotlinx.coroutines.android)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
