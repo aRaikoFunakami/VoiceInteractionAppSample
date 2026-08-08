@@ -24,4 +24,10 @@ dependencyResolutionManagement {
 
 rootProject.name = "VoiceInteractionAppSample"
 include(":app")
+include(":via")
+include(":realtime")
+include(":audio")
+include(":tools")
+include(":session")
+include(":diagnostics")
  
