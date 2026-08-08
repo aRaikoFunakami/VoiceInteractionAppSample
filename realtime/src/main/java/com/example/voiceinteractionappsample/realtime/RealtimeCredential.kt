@@ -7,6 +7,12 @@ import java.time.Instant
  * ```json
  * { "clientSecret": "...", "expiresAt": "...", "sessionConfigVersion": "..." }
  * ```
+ *
+ * This is our own Broker's shape, not OpenAI's. Verified live against
+ * `POST /v1/realtime/client_secrets` (2026-08): OpenAI's own response uses `value` (the
+ * secret) and `expires_at` (unix epoch seconds), not `clientSecret`/`expiresAt` ISO-8601 —
+ * the real Broker implementation maps OpenAI's `value`/`expires_at` onto this shape, it does
+ * not pass them through verbatim.
  */
 data class RealtimeCredential(
     val clientSecret: String,
