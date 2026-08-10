@@ -98,7 +98,23 @@ class ConversationController(
         _state.update { it.copy(connection = ConnectionState.CONNECTING) }
         requestAudioFocus()
 
-        val adm = WebRtcAudioEngine.create(context, aecMode = aecMode)
+        // 実機で発見: AAOS Emulatorのaudioserverがセッション確立の瞬間にクラッシュ/自己再起動
+        // することがあり、その巻き添えでAudioTrack初期化が失敗する（"AudioFlinger could not
+        // create track"）。WebRtcAudioEngineは元々onRecordError/onPlayoutErrorを持っていたが
+        // 誰も配線しておらず、失敗しても内部ログにしか残らずUIは平然とLISTENINGのままだった
+        // ("話しかけたが何もおきない"の正体) — ここで拾ってERROR状態に反映する。
+        val adm = WebRtcAudioEngine.create(
+            context,
+            aecMode = aecMode,
+            onRecordError = { message ->
+                Log.e(TAG, "audio record error: $message")
+                _state.update { it.copy(audioInput = AudioInputState.ERROR) }
+            },
+            onPlayoutError = { message ->
+                Log.e(TAG, "audio playout error: $message")
+                _state.update { it.copy(audioOutput = AudioOutputState.ERROR) }
+            },
+        )
         audioDeviceModule = adm
         val factory = WebRtcFactoryProvider.create(context, adm)
         peerConnectionFactory = factory
