@@ -14,12 +14,16 @@ import com.example.voiceinteractionappsample.session.ConnectionState
 import com.example.voiceinteractionappsample.session.ConversationController
 import com.example.voiceinteractionappsample.session.ConversationSessionState
 import com.example.voiceinteractionappsample.session.ConversationState
+import com.example.voiceinteractionappsample.tools.DeviceToolExecutor
+import com.example.voiceinteractionappsample.tools.OpenYouTubeSearchTool
+import com.example.voiceinteractionappsample.tools.OpenYouTubeSearchToolSchema
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 /**
  * Owns Voice Plate + the conversation session lifecycle (1節, 17節) — and actually starts/stops
@@ -39,9 +43,14 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     // this (ViewRootImpl rejecting the setState() call chain from a background thread).
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var voicePlateView: VoicePlateView? = null
+    // 実機で発見（"ツールを呼び出せない"）: スキーマ・実行パイプライン自体はPhase 8-9で
+    // 作って個別にテスト済みだったが、ConversationControllerへの配線が漏れていた
+    // （session.updateの`tools`が常に空配列のままサーバーに送られていた）。
     private val controller = ConversationController(
         context = context,
         credentialProvider = HttpRealtimeCredentialProvider(LOCAL_BROKER_URL),
+        toolSchemas = JSONArray().put(OpenYouTubeSearchToolSchema.toJson()),
+        toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
         onAutoTerminated = { reason ->
             // 実機で発見: watchdogは正しくRTC/micを止めていたが、誰もVoice Plateを隠さない
             // ため画面だけが古い状態のまま残っていた。self-terminate側からもhide()を呼ぶ。
@@ -76,7 +85,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
             try {
                 controller.start()
             } catch (e: Exception) {
-                voicePlateView?.setState(VoicePlateState.ERROR)
+                voicePlateView?.render(VoicePlateState.ERROR, ConversationSessionState())
             }
         }
     }
@@ -102,7 +111,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
             state.conversation == ConversationState.MODEL_PROCESSING -> VoicePlateState.THINKING
             else -> VoicePlateState.LISTENING
         }
-        voicePlateView?.setState(plateState)
+        voicePlateView?.render(plateState, state)
     }
 
     private companion object {
