@@ -270,6 +270,7 @@ class ConversationController(
 
     private companion object {
         const val TAG = "ConversationController"
-        const val WATCHDOG_CHECK_INTERVAL_MS = 5_000L
+        // 10秒アイドルタイムアウトに対して検出遅延が相対的に大きくならないよう短めにする。
+        const val WATCHDOG_CHECK_INTERVAL_MS = 2_000L
     }
 }

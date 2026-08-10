@@ -16,8 +16,8 @@ package com.example.voiceinteractionappsample.session
  * 値そのものは他の未確定値（RealtimeVadConfig等）と同様、実運用前の暫定値。
  */
 data class SessionTimeoutPolicy(
-    val idleTimeoutMs: Long = 60_000,
-    val maxSessionDurationMs: Long = 10 * 60_000,
+    val idleTimeoutMs: Long = 10_000,
+    val maxSessionDurationMs: Long = 2 * 60_000,
 ) {
     init {
         require(idleTimeoutMs > 0) { "idleTimeoutMs must be > 0, was $idleTimeoutMs" }
