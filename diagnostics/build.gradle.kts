@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":audio"))
     implementation(project(":tools"))
     implementation(project(":session"))
+    implementation(libs.kotlinx.coroutines.android)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
