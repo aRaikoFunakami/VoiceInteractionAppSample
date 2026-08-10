@@ -52,6 +52,13 @@ adb shell settings put secure voice_interaction_service \
   "com.example.voiceinteractionappsample/com.example.voiceinteractionappsample.via.VoiceInteractionServiceImpl"
 ```
 
+**⚠️ エミュレータをコールドブートするとこの設定はGoogle Assistantに戻る**（アプリ自体や
+RECORD_AUDIO権限は消えない — `voice_interaction_service`のsecure settingだけがリセット
+される、実機検証で確認済み）。コールドブート後は上のコマンドを再実行すること。
+Settings > Assistant & voice の「Voice input」行が消えていたらこれが原因。GUIから直す
+場合は「Digital assistant app」の**行のテキスト部分**をタップする（右端の歯車アイコンは
+Google Assistant自体の設定に飛ぶだけで無関係）。
+
 ## 5. 会話を始める
 
 **Android Studio / エミュレータ画面から（推奨）**: エミュレータ画面右下、音量調整の右にある
