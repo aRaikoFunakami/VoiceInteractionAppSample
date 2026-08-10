@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
 import com.example.voiceinteractionappsample.session.AudioOutputState
 import com.example.voiceinteractionappsample.session.ConnectionState
@@ -40,8 +42,23 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
         credentialProvider = HttpRealtimeCredentialProvider(LOCAL_BROKER_URL),
     )
 
-    override fun onCreateContentView(): View =
-        VoicePlateView(context).also { voicePlateView = it }
+    override fun onCreateContentView(): View {
+        val plate = VoicePlateView(context).also { voicePlateView = it }
+        // ユーザーからのフィードバック: 止める手段が画面上に見えず、課金が心配で画面を
+        // スリープさせる、という誤った回避策を取らせてしまっていた（スリープは接続もmicも
+        // 止めない）。ステータスバーの小さいマイクアイコンの再タップだけに頼らず、常に見える
+        // 終了ボタンをVoice Plate自体に置く。hide()を呼ぶことで既存のonHide() -> cancel()の
+        // 経路をそのまま再利用する — 終了経路を2本持たない。
+        val stopButton = Button(context).apply {
+            text = "STOP"
+            setOnClickListener { hide() }
+        }
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(plate)
+            addView(stopButton)
+        }
+    }
 
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
