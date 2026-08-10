@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.SystemClock
 import android.util.Log
 import com.example.voiceinteractionappsample.audio.AecMode
 import com.example.voiceinteractionappsample.audio.WebRtcAudioEngine
@@ -15,12 +16,15 @@ import com.example.voiceinteractionappsample.realtime.WebRtcFactoryProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import org.json.JSONObject
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
@@ -35,7 +39,7 @@ import org.webrtc.RtpTransceiver
 import org.webrtc.audio.JavaAudioDeviceModule
 
 /** Why [ConversationController.cancel] was called — recorded for diagnostics (21節). */
-enum class DisconnectReason { USER_CANCEL, NETWORK_LOST, HIDE_COMPLETE, ERROR }
+enum class DisconnectReason { USER_CANCEL, NETWORK_LOST, HIDE_COMPLETE, ERROR, IDLE_TIMEOUT, MAX_DURATION_EXCEEDED }
 
 /**
  * Owns the Realtime connection lifecycle (1節, 17節, 18節): connection state, microphone
@@ -54,9 +58,15 @@ class ConversationController(
     private val vadConfig: RealtimeVadConfig = RealtimeVadConfig(),
     private val aecMode: AecMode = AecMode.AUTO,
     private val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
+    private val sessionTimeoutPolicy: SessionTimeoutPolicy = SessionTimeoutPolicy(),
 ) : PeerConnection.Observer {
 
     private var reconnectAttempt = 0
+    private var watchdogJob: Job? = null
+
+    // SystemClock.elapsedRealtime() — monotonic, unaffected by wall-clock adjustments.
+    @Volatile private var sessionStartedAtMs = 0L
+    @Volatile private var lastActivityAtMs = 0L
 
     private val _state = MutableStateFlow(ConversationSessionState())
     val state: StateFlow<ConversationSessionState> = _state.asStateFlow()
@@ -98,14 +108,43 @@ class ConversationController(
             )
         }
 
+        val now = SystemClock.elapsedRealtime()
+        sessionStartedAtMs = now
+        lastActivityAtMs = now
+
         eventCollectionJob = scope.launch {
             newConnection.events.incoming().collect { json ->
                 onRealtimeEvent(JSONObject(json).optString("type", "unknown"))
             }
         }
+        watchdogJob = scope.launch { runTimeoutWatchdog() }
+    }
+
+    /**
+     * 26節「conversation idle timeout」への対応 — 課金リスクの歯止め（ユーザーからの
+     * フィードバックで追加）。アイドルタイムアウトと最大セッション時間の両方を見る。
+     */
+    private suspend fun runTimeoutWatchdog() {
+        while (coroutineContext.isActive) {
+            delay(WATCHDOG_CHECK_INTERVAL_MS)
+            val now = SystemClock.elapsedRealtime()
+            when {
+                now - sessionStartedAtMs >= sessionTimeoutPolicy.maxSessionDurationMs -> {
+                    Log.w(TAG, "max session duration exceeded, forcing cancel")
+                    cancel(DisconnectReason.MAX_DURATION_EXCEEDED)
+                    return
+                }
+                now - lastActivityAtMs >= sessionTimeoutPolicy.idleTimeoutMs -> {
+                    Log.w(TAG, "idle timeout exceeded, forcing cancel")
+                    cancel(DisconnectReason.IDLE_TIMEOUT)
+                    return
+                }
+            }
+        }
     }
 
     private fun onRealtimeEvent(type: String) {
+        lastActivityAtMs = SystemClock.elapsedRealtime()
         when (type) {
             "output_audio_buffer.started" -> _state.update { it.copy(audioOutput = AudioOutputState.PLAYING) }
             "output_audio_buffer.stopped", "response.done" ->
@@ -133,6 +172,7 @@ class ConversationController(
             activeConnection?.events?.send(JSONObject().put("type", "response.cancel").toString())
         }
         safely("eventCollectionJob.cancel") { eventCollectionJob?.cancel() }
+        safely("watchdogJob.cancel") { watchdogJob?.takeIf { it !== coroutineContext[Job] }?.cancel() }
         safely("events.close (DataChannel)") { activeConnection?.events?.close() }
         safely("peerConnection.close") { activeConnection?.peerConnection?.close() }
         safely("localAudioTrack.dispose") { localAudioTrack?.dispose() }
@@ -147,6 +187,7 @@ class ConversationController(
         peerConnectionFactory = null
         audioDeviceModule = null
         eventCollectionJob = null
+        watchdogJob = null
 
         _state.value = ConversationSessionState() // all-idle/disconnected default
     }
@@ -229,5 +270,6 @@ class ConversationController(
 
     private companion object {
         const val TAG = "ConversationController"
+        const val WATCHDOG_CHECK_INTERVAL_MS = 5_000L
     }
 }
