@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
+import com.example.voiceinteractionappsample.session.AudioInputState
 import com.example.voiceinteractionappsample.session.AudioOutputState
 import com.example.voiceinteractionappsample.session.ConnectionState
 import com.example.voiceinteractionappsample.session.ConversationController
@@ -92,6 +93,10 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     private fun updateVoicePlate(state: ConversationSessionState) {
         val plateState = when {
             state.connection == ConnectionState.FAILED -> VoicePlateState.ERROR
+            // audioserverクラッシュ等でAudioTrack/AudioRecordの初期化自体が失敗するケース
+            // (実機で発見) — 接続自体はCONNECTEDのまま残るのでconnection軸だけでは拾えない。
+            state.audioInput == AudioInputState.ERROR -> VoicePlateState.ERROR
+            state.audioOutput == AudioOutputState.ERROR -> VoicePlateState.ERROR
             state.connection == ConnectionState.CONNECTING -> VoicePlateState.WORKING
             state.audioOutput == AudioOutputState.PLAYING -> VoicePlateState.SPEAKING
             state.conversation == ConversationState.MODEL_PROCESSING -> VoicePlateState.THINKING
