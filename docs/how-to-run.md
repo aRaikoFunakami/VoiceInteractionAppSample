@@ -55,6 +55,13 @@ about apps...」）で必ずOKを押す**。ラジオボタンをタップした
 このダイアログでキャンセル/離脱すると選択前の状態に戻る。OKまで押せば
 `voice_interaction_service`と`assistant`ロールの両方が正しく切り替わることを確認済み。
 
+**⚠️ OKを押した後、画面を出入りすると「Digital assistant app: None」と表示されることが
+ある** — これはCar Settings UI側の表示バグで、実体は壊れていない（実機検証済み:
+`adb shell settings get secure voice_interaction_service` / `assistant` は両方とも正しく
+このアプリを指したまま、`dumpsys voiceinteraction`のmComponent/mBoundも正常、実際に
+`cmd voiceinteraction show`で起動もする）。サードパーティ製アシスタントアプリの名前を
+このUIが解決できずNoneに落ちているだけと見られる。気にせず動作確認を続けてよい。
+
 **adbから（同じ効果、`voice_interaction_service`のみ更新）**:
 
 ```bash
