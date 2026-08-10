@@ -58,6 +58,17 @@ adb shell settings put secure voice_interaction_service \
 **マイクアイコンをクリック**する。物理PTTボタンの代わりにこれがトリガーになっている
 （実機検証済み）。マウス操作だけで完結し、adbコマンドは不要。
 
+![マイクアイコンの位置](images/mic_button_location.png)
+
+拡大するとこの位置（画面右下の角）:
+
+![マイクアイコンの拡大](images/mic_button_closeup.png)
+
+クリック前（グレー・非アクティブ）とクリック後（青・アクティブ、Voice Plateが
+"LISTENING"を表示）の比較:
+
+![クリック前後の比較](images/mic_button_before_after.png)
+
 コマンドラインから同じことをする場合:
 
 ```bash
