@@ -256,6 +256,11 @@ class ConversationController(
 
     // PeerConnection.Observer — feeds ConnectionState from real ICE state (7-1節, 7-3節).
     override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
+        // 実機で発見: SDP交渉(シグナリング)自体は成功したのに、その後ICE/DTLSが繋がらず
+        // Realtimeイベントが1つも来ない、というケースがログから一切見えなかった —
+        // 「何も起きなかった」ことの原因究明が状況証拠頼みになっていた。ここに1行足すだけで
+        // 次回はCHECKINGのまま固まっている、等が直接見える。
+        Log.i(TAG, "ICE state: $newState")
         when (newState) {
             PeerConnection.IceConnectionState.CONNECTED,
             PeerConnection.IceConnectionState.COMPLETED -> {
