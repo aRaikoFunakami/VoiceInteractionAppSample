@@ -47,6 +47,16 @@ adb shell am force-stop com.example.voiceinteractionappsample
 
 ## 4. 既定のVoice Interaction Appとして登録する
 
+**GUIから（実機検証済み・こちらでOK）**: Settings > Assistant & voice > 「Digital assistant
+app」の**行のテキスト部分**をタップ（右端の歯車アイコンはGoogle Assistant自身の設定に
+飛ぶだけで無関係・ハマりどころ）→ ピッカーで「VoiceInteractionAppSample」のラジオボタンを
+タップ → **直後に出る確認ダイアログ（「The assistant will be able to read information
+about apps...」）で必ずOKを押す**。ラジオボタンをタップしただけではまだ確定しない —
+このダイアログでキャンセル/離脱すると選択前の状態に戻る。OKまで押せば
+`voice_interaction_service`と`assistant`ロールの両方が正しく切り替わることを確認済み。
+
+**adbから（同じ効果、`voice_interaction_service`のみ更新）**:
+
 ```bash
 adb shell settings put secure voice_interaction_service \
   "com.example.voiceinteractionappsample/com.example.voiceinteractionappsample.via.VoiceInteractionServiceImpl"
@@ -54,10 +64,8 @@ adb shell settings put secure voice_interaction_service \
 
 **⚠️ エミュレータをコールドブートするとこの設定はGoogle Assistantに戻る**（アプリ自体や
 RECORD_AUDIO権限は消えない — `voice_interaction_service`のsecure settingだけがリセット
-される、実機検証で確認済み）。コールドブート後は上のコマンドを再実行すること。
-Settings > Assistant & voice の「Voice input」行が消えていたらこれが原因。GUIから直す
-場合は「Digital assistant app」の**行のテキスト部分**をタップする（右端の歯車アイコンは
-Google Assistant自体の設定に飛ぶだけで無関係）。
+される、実機検証で確認済み）。コールドブート後はGUIかadbのどちらかで選び直すこと。
+Settings > Assistant & voice の「Voice input」行が消えていたらこれが原因。
 
 ## 5. 会話を始める
 
