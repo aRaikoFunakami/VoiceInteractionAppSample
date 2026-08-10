@@ -40,24 +40,35 @@ class SessionTimeoutWatchdogLiveTest {
         assumeNotNull(secret)
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        var autoTerminatedReason: DisconnectReason? = null
         val controller = ConversationController(
             context,
             MockRealtimeCredentialProvider(secret!!, Instant.now().plusSeconds(60)),
             sessionTimeoutPolicy = SessionTimeoutPolicy(idleTimeoutMs = 60_000, maxSessionDurationMs = 3_000),
+            onAutoTerminated = { autoTerminatedReason = it },
         )
 
         controller.start()
         delay(2_000) // let SDP negotiation actually land on CONNECTED
         assertEquals(ConnectionState.CONNECTED, controller.state.value.connection)
 
-        // maxSessionDurationMs=3s already elapsed by now; give the 5s-interval watchdog one
-        // full cycle plus margin to actually act on it.
+        // maxSessionDurationMs=3s already elapsed by now; give the 2s-interval watchdog a
+        // couple of cycles plus margin to actually act on it.
         delay(8_000)
 
         assertEquals(
             "expected the watchdog to have force-cancelled the session by now",
             ConversationSessionState(),
             controller.state.value,
+        )
+        // Found live (real bug, not hypothetical): the watchdog was correctly cancelling the
+        // RTC/mic the whole time, but nothing told CarVoiceInteractionSession to hide() —
+        // the Voice Plate stayed on screen showing stale state indefinitely. This callback is
+        // the fix; this assertion is what would have caught it before it shipped.
+        assertEquals(
+            "expected onAutoTerminated to fire with MAX_DURATION_EXCEEDED so the UI can hide itself",
+            DisconnectReason.MAX_DURATION_EXCEEDED,
+            autoTerminatedReason,
         )
     }
 }

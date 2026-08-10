@@ -3,6 +3,7 @@ package com.example.voiceinteractionappsample.via
 import android.content.Context
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -40,6 +41,13 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     private val controller = ConversationController(
         context = context,
         credentialProvider = HttpRealtimeCredentialProvider(LOCAL_BROKER_URL),
+        onAutoTerminated = { reason ->
+            // 実機で発見: watchdogは正しくRTC/micを止めていたが、誰もVoice Plateを隠さない
+            // ため画面だけが古い状態のまま残っていた。self-terminate側からもhide()を呼ぶ。
+            // onAutoTerminatedはバックグラウンドディスパッチャから呼ばれるのでMainへ渡す。
+            Log.i(TAG, "auto-terminated: $reason — hiding Voice Plate")
+            scope.launch { hide() }
+        },
     )
 
     override fun onCreateContentView(): View {
@@ -93,6 +101,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     }
 
     private companion object {
+        const val TAG = "CarVoiceInteractionSession"
         // AVD限定 (10.0.2.2 = host loopback)。実機/実Brokerでは差し替える。
         const val LOCAL_BROKER_URL = "http://10.0.2.2:8787/api/realtime/session"
     }

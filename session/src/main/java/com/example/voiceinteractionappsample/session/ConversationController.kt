@@ -59,6 +59,17 @@ class ConversationController(
     private val aecMode: AecMode = AecMode.AUTO,
     private val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     private val sessionTimeoutPolicy: SessionTimeoutPolicy = SessionTimeoutPolicy(),
+    /**
+     * Called when [cancel] runs for any reason OTHER than [DisconnectReason.USER_CANCEL] —
+     * i.e. the connection tore itself down (idle timeout, max duration, ICE failure) without
+     * anyone telling the UI. Found live: the watchdog was correctly cancelling the RTC/mic
+     * (verified via AudioRecord standby state and logs) the whole time, but nothing told
+     * [CarVoiceInteractionSession] to hide, so the Voice Plate kept showing a stale
+     * "LISTENING" indefinitely — looked exactly like the timeout wasn't working at all.
+     * Invoked from [scope] (background dispatcher) — the caller must hop to Main itself if it
+     * touches UI (that's exactly what [CarVoiceInteractionSession] does here).
+     */
+    private val onAutoTerminated: (DisconnectReason) -> Unit = {},
 ) : PeerConnection.Observer {
 
     private var reconnectAttempt = 0
@@ -117,6 +128,7 @@ class ConversationController(
                 onRealtimeEvent(JSONObject(json).optString("type", "unknown"))
             }
         }
+        Log.i(TAG, "start(): watchdog launching, idleTimeoutMs=${sessionTimeoutPolicy.idleTimeoutMs} maxSessionDurationMs=${sessionTimeoutPolicy.maxSessionDurationMs}")
         watchdogJob = scope.launch { runTimeoutWatchdog() }
     }
 
@@ -190,6 +202,10 @@ class ConversationController(
         watchdogJob = null
 
         _state.value = ConversationSessionState() // all-idle/disconnected default
+
+        if (reason != DisconnectReason.USER_CANCEL) {
+            safely("onAutoTerminated callback") { onAutoTerminated(reason) }
+        }
     }
 
     private inline fun safely(step: String, block: () -> Unit) {
