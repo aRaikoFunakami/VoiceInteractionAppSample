@@ -10,9 +10,12 @@ import com.example.voiceinteractionappsample.audio.AecMode
 import com.example.voiceinteractionappsample.audio.WebRtcAudioEngine
 import com.example.voiceinteractionappsample.realtime.RealtimeConnection
 import com.example.voiceinteractionappsample.realtime.RealtimeCredentialProvider
+import com.example.voiceinteractionappsample.realtime.RealtimeEventCodec
 import com.example.voiceinteractionappsample.realtime.RealtimeVadConfig
+import com.example.voiceinteractionappsample.realtime.RealtimeEvent
 import com.example.voiceinteractionappsample.realtime.RealtimeWebRtcClient
 import com.example.voiceinteractionappsample.realtime.WebRtcFactoryProvider
+import com.example.voiceinteractionappsample.tools.DeviceToolExecutor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
+import org.json.JSONArray
 import org.json.JSONObject
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
@@ -59,6 +63,15 @@ class ConversationController(
     private val aecMode: AecMode = AecMode.AUTO,
     private val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     private val sessionTimeoutPolicy: SessionTimeoutPolicy = SessionTimeoutPolicy(),
+    /**
+     * 実機で発見（"ツールを呼び出せない"）: :tools側のスキーマ・実行パイプライン・
+     * [RealtimeToolBridge]は全部Phase 8-9で作って個別にテスト済みだったのに、
+     * ConversationControllerが誰も配線していなかった — session.updateの`tools`が常に空配列
+     * のままサーバーに送られていた（実機ログで確認: `"tools":[]`）。デフォルトは空のまま
+     * （既存の呼び出し元・テストを壊さない）— 実際にtoolを使わせたい呼び出し側が渡す。
+     */
+    private val toolSchemas: JSONArray = JSONArray(),
+    private val toolExecutor: DeviceToolExecutor = DeviceToolExecutor(emptyList()),
     /**
      * Called when [cancel] runs for any reason OTHER than [DisconnectReason.USER_CANCEL] —
      * i.e. the connection tore itself down (idle timeout, max duration, ICE failure) without
@@ -126,12 +139,15 @@ class ConversationController(
         val client = RealtimeWebRtcClient(factory, credentialProvider)
         val newConnection = client.connect(this, track)
         connection = newConnection
-        newConnection.events.send(vadConfig.toSessionUpdateEvent())
+        newConnection.events.send(buildSessionUpdateEvent())
 
         _state.update {
             it.copy(
                 connection = ConnectionState.CONNECTED,
                 audioInput = AudioInputState.CAPTURING,
+                // ユーザー要望: マイクが受付状態になった時点で画面に固定挨拶を出す。実際の
+                // モデル応答が来ればすぐ上書きされる — 同じ表示欄を再利用しているだけ。
+                assistantTranscript = GREETING_TEXT,
             )
         }
 
@@ -141,7 +157,12 @@ class ConversationController(
 
         eventCollectionJob = scope.launch {
             newConnection.events.incoming().collect { json ->
-                onRealtimeEvent(JSONObject(json).optString("type", "unknown"))
+                // Debugレベルで生イベントを残す — このセッション内だけでも複数回、
+                // 「実際に何が起きているか」の切り分けにログの実物が必要だった
+                // (audioserverクラッシュ、ICEハング、session.updateドロップ、今回の割り込み
+                // 頻発など)。毎回一時的に足すより最初から残しておく方が早い。
+                Log.d(TAG, "event: $json")
+                onRealtimeEvent(JSONObject(json))
             }
         }
         Log.i(TAG, "start(): watchdog launching, idleTimeoutMs=${sessionTimeoutPolicy.idleTimeoutMs} maxSessionDurationMs=${sessionTimeoutPolicy.maxSessionDurationMs}")
@@ -171,9 +192,9 @@ class ConversationController(
         }
     }
 
-    private fun onRealtimeEvent(type: String) {
+    private suspend fun onRealtimeEvent(event: JSONObject) {
         lastActivityAtMs = SystemClock.elapsedRealtime()
-        when (type) {
+        when (val type = event.optString("type", "unknown")) {
             "output_audio_buffer.started" -> _state.update { it.copy(audioOutput = AudioOutputState.PLAYING) }
             "output_audio_buffer.stopped", "response.done" ->
                 _state.update { it.copy(audioOutput = AudioOutputState.IDLE, conversation = ConversationState.IDLE) }
@@ -181,8 +202,63 @@ class ConversationController(
                 _state.update { it.copy(conversation = ConversationState.USER_SPEAKING) }
             "input_audio_buffer.speech_stopped" ->
                 _state.update { it.copy(conversation = ConversationState.MODEL_PROCESSING) }
+            // ユーザー要望4: 音声認識されたユーザーの発話をデバッグ表示。session.updateで
+            // audio.input.transcriptionを有効にしないとこのイベント自体来ない。
+            "conversation.item.input_audio_transcription.completed" ->
+                _state.update { it.copy(userTranscript = event.optString("transcript")) }
+            // ユーザー要望5: AIの発話内容(音声に同期したテキスト)をデバッグ表示。イベント名は
+            // APIバージョンにより response.audio_transcript.done / response.output_audio_transcript.done
+            // の両方があり得るため両対応しておく（実機で実際に来た方を確認済み — 下記参照）。
+            "response.audio_transcript.done", "response.output_audio_transcript.done" ->
+                _state.update { it.copy(assistantTranscript = event.optString("transcript")) }
+            // ユーザー要望・実機で発見: サーバーVADがAI自身の発話中に "input_audio_buffer.
+            // speech_started" を検出すると、即座にoutput_audio_bufferがclearされ応答が
+            // 打ち切られる(conversation.item.truncated)。実機ログで頻発を確認 — ユーザーが
+            // 何も言っていないのに毎回打ち切られる症状で、エコーキャンセラーがAI自身の声を
+            // 拾って誤って割り込みと判定している疑い。ログ+画面に必ず残す。
+            "output_audio_buffer.cleared" -> {
+                Log.w(TAG, "assistant response interrupted (barge-in detected by server VAD, or echo)")
+                _state.update { it.copy(interruptionCount = it.interruptionCount + 1) }
+            }
+            // 実機で発見（"ツールを呼び出せない"）: :toolsのスキーマ/実行パイプライン/
+            // RealtimeToolBridgeはPhase 8-9で作って個別にテスト済みだったが、
+            // ここが配線されていなかったためsession.updateの`tools`が常に空で、モデルは
+            // ツールの存在自体を知らなかった（実機ログで`"tools":[]`を確認）。
+            "response.function_call_arguments.done" -> handleFunctionCall(event)
+            else -> Unit
         }
     }
+
+    private suspend fun handleFunctionCall(event: JSONObject) {
+        val call = RealtimeToolBridge.decodeFunctionCall(RealtimeEvent(event.optString("type"), event)) ?: return
+        Log.i(TAG, "tool call: ${call.name}(${call.argumentsJson})")
+        val result = toolExecutor.execute(call)
+        Log.i(TAG, "tool result: ${result.outcome} ${result.output}")
+        val activeConnection = connection ?: return
+        RealtimeToolBridge.encodeFunctionCallOutput(result).forEach { activeConnection.events.send(it) }
+    }
+
+    /** VAD調整 + 車載アシスタント人格 + 日本語文字起こし + tool登録を1つのsession.updateにまとめる。 */
+    private fun buildSessionUpdateEvent(): String =
+        RealtimeEventCodec.encodeSessionUpdate(
+            JSONObject()
+                .put("type", "realtime")
+                .put("instructions", CAR_ASSISTANT_INSTRUCTIONS)
+                .put("tools", toolSchemas)
+                .put(
+                    "audio",
+                    JSONObject().put(
+                        "input",
+                        JSONObject()
+                            .put("turn_detection", vadConfig.toTurnDetectionJson())
+                            // ユーザー要望2: 英語しか認識しない対策 — STTに言語をヒントする。
+                            .put(
+                                "transcription",
+                                JSONObject().put("model", "whisper-1").put("language", "ja"),
+                            ),
+                    ),
+                )
+        )
 
     /**
      * 18節: 全conversation状態から呼べる。冪等 — 既に切断済みなら何もしない。各ステップは
@@ -224,7 +300,7 @@ class ConversationController(
         }
     }
 
-    private inline fun safely(step: String, block: () -> Unit) {
+    private suspend inline fun safely(step: String, crossinline block: suspend () -> Unit) {
         try {
             block()
         } catch (e: Exception) {
@@ -309,5 +385,16 @@ class ConversationController(
         const val TAG = "ConversationController"
         // 10秒アイドルタイムアウトに対して検出遅延が相対的に大きくならないよう短めにする。
         const val WATCHDOG_CHECK_INTERVAL_MS = 2_000L
+
+        const val GREETING_TEXT = "こんにちは、何か御用ですか"
+
+        // ユーザー要望3: 車のAIアシスタントとして振る舞わせる。ユーザー要望2の「日本語で
+        // 話す」もここで指示する — Realtime APIには出力言語を直接指定するフィールドが無く、
+        // instructionsで指示するのが標準的なやり方。
+        const val CAR_ASSISTANT_INSTRUCTIONS = """
+あなたは自動車に搭載されている音声AIアシスタントです。運転者や同乗者の質問や指示に、
+必ず日本語で、簡潔かつ分かりやすく答えてください。運転の妨げにならないよう、長い説明は
+避け、要点だけを話してください。
+        """
     }
 }

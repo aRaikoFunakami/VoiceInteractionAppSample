@@ -53,7 +53,7 @@ object RealtimeLiveTestHarness {
         return connection
     }
 
-    fun requestAssistantSpeech(connection: RealtimeConnection, instructions: String) {
+    suspend fun requestAssistantSpeech(connection: RealtimeConnection, instructions: String) {
         connection.events.send(
             JSONObject()
                 .put("type", "response.create")

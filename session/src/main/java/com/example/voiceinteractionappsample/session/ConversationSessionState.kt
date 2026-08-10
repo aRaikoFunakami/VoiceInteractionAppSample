@@ -44,4 +44,10 @@ data class ConversationSessionState(
     val audioInput: AudioInputState = AudioInputState.STOPPED,
     val audioOutput: AudioOutputState = AudioOutputState.IDLE,
     val conversation: ConversationState = ConversationState.IDLE,
+    /** ユーザー発話の音声認識結果（デバッグ表示用）。 */
+    val userTranscript: String = "",
+    /** AIの発話内容のテキスト（デバッグ表示用）。マイク受付開始時は固定の挨拶文が入る。 */
+    val assistantTranscript: String = "",
+    /** サーバーVADがAIの発話を割り込みとして打ち切った回数（デバッグ表示用、実機で発見）。 */
+    val interruptionCount: Int = 0,
 )
