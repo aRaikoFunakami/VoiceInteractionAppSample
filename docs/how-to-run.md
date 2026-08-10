@@ -27,6 +27,11 @@ python3 backend/local_broker.py
 ./gradlew :app:installDebug
 ```
 
+Android Studioの **Run** ボタンでも同じことができる。ただしRunは唯一のランチャー画面
+（`DiagnosticsActivity`、診断画面）を自動起動するだけで、音声アシスタント本体は起動しない
+——それは通常のActivityではなく `VoiceInteractionService` なので、Run/デバッグの対象には
+ならない。起動方法はステップ5を参照。
+
 ## 3. マイク権限を付与する（AAOSは複数ユーザー — 全ユーザーに付与する）
 
 ```bash
@@ -49,7 +54,11 @@ adb shell settings put secure voice_interaction_service \
 
 ## 5. 会話を始める
 
-このAVDスキンには物理PTTボタンが無いため、`adb`から直接トリガーする。
+**Android Studio / エミュレータ画面から（推奨）**: エミュレータ画面右下、音量調整の右にある
+**マイクアイコンをクリック**する。物理PTTボタンの代わりにこれがトリガーになっている
+（実機検証済み）。マウス操作だけで完結し、adbコマンドは不要。
+
+コマンドラインから同じことをする場合:
 
 ```bash
 adb shell cmd voiceinteraction show
@@ -63,7 +72,7 @@ Voice Plateが左上に表示され、状態（LISTENING/THINKING/SPEAKING/WORKI
 AAOSの標準機能である Link Viewer（QRコード表示、運転中にブラウザを直接開かせない仕組み）
 が開く。
 
-終了するには:
+終了するには、同じマイクアイコンをもう一度クリックするか:
 
 ```bash
 adb shell cmd voiceinteraction hide
