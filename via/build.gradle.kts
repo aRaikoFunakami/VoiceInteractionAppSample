@@ -20,4 +20,5 @@ android {
 
 dependencies {
     api(project(":session"))
+    implementation(libs.kotlinx.coroutines.android)
 }
