@@ -12,3 +12,8 @@
       変わっていない
 - [ ] 新しいtoolのschemaに `additionalProperties: false` 相当の制約がある
       （任意のプロパティを無制限に受け付けない）
+- [ ] `execute()` の中でAndroid `TextToSpeech` 等のローカル音声合成を使って
+      「〜を開きます」等の先読み発話をしていない（15節）— ユーザーへの説明はRealtimeモデルに
+      統一する。tool実行とRealtime assistant audioが同時に鳴る事故を防ぐ。
+      2026-08時点でリポジトリ全体に `TextToSpeech` の使用箇所はゼロ（`grep -rn TextToSpeech`
+      で確認済み、Issue #29）。
