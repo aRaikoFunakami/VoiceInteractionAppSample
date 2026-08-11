@@ -1,11 +1,15 @@
 package com.example.voiceinteractionappsample.via
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.util.Log
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
 import com.example.voiceinteractionappsample.session.AudioInputState
@@ -71,10 +75,28 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
             text = "STOP"
             setOnClickListener { hide() }
         }
-        return LinearLayout(context).apply {
+        // ユーザー指摘: このウィンドウは背景が透明なまま(TYPE_VOICE_INTERACTIONの既定)で、
+        // かつ中身が画面幅いっぱいに伸びていたため、後ろの画面の文字とデバッグ表示が重なって
+        // 読みにくかった。Google Assistant自身のUI（丸みのある半透明の吹き出し、画面には
+        // り付かず内容に合わせたサイズ）を参考に、コンテンツに合わせた角丸カードにする。
+        val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(plate)
             addView(stopButton)
+            background = GradientDrawable().apply {
+                setColor(0xE6202124.toInt()) // 濃いグレー、半透明
+                cornerRadius = 32f
+            }
+            setPadding(32, 32, 32, 32)
+        }
+        return FrameLayout(context).apply {
+            addView(
+                card,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { gravity = Gravity.TOP or Gravity.START; setMargins(32, 32, 32, 32) },
+            )
         }
     }
 

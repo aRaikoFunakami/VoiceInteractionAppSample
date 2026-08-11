@@ -1,6 +1,7 @@
 package com.example.voiceinteractionappsample.via
 
 import android.content.Context
+import android.graphics.Color
 import android.util.AttributeSet
 import android.widget.TextView
 import com.example.voiceinteractionappsample.session.ConversationSessionState
@@ -20,6 +21,9 @@ class VoicePlateView @JvmOverloads constructor(
     init {
         textSize = 20f
         setPadding(48, 48, 48, 48)
+        // カード背景を付けたので、テーマ依存の既定色に頼らず明示的に白にする（実機で発見:
+        // 背景なしの時は透明ウィンドウの下の画面色に助けられて偶然読めていただけだった）。
+        setTextColor(Color.WHITE)
     }
 
     fun render(plateState: VoicePlateState, session: ConversationSessionState) {
