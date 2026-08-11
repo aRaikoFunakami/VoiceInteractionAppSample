@@ -1,10 +1,14 @@
 package com.example.voiceinteractionappsample.realtime
 
+import android.os.SystemClock
+import android.util.Log
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.webrtc.AudioTrack
@@ -52,8 +56,18 @@ class RealtimeWebRtcClient(
     suspend fun connect(
         observer: PeerConnection.Observer,
         localAudioTrack: AudioTrack? = null,
-    ): RealtimeConnection {
-        val credential = credentialProvider.fetchCredential()
+    ): RealtimeConnection = coroutineScope {
+        // 実機で発見（ユーザー指摘）: credential取得(Broker経由のOpenAIへのネットワーク往復)を
+        // ローカルのWebRTCセットアップ(PeerConnection/track/offer作成)より先に直列で待って
+        // いたため、addTrack()が引き金になるinitPlayoutが本来不要な2秒以上遅れていた —
+        // "スピーカー初期化が遅い"ように見えていたが実際はcredential待ちだった。
+        // credentialが実際に必要なのは最後のpostOffer()だけなので、ここだけ並列に走らせる。
+        val t0 = SystemClock.elapsedRealtime()
+        val credentialDeferred = async {
+            credentialProvider.fetchCredential().also {
+                Log.i(TAG, "credential fetch took ${SystemClock.elapsedRealtime() - t0}ms")
+            }
+        }
 
         val rtcConfig = PeerConnection.RTCConfiguration(emptyList())
         val peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, observer)
@@ -75,15 +89,20 @@ class RealtimeWebRtcClient(
 
         val offer = peerConnection.createOfferSuspend()
         peerConnection.setLocalDescriptionSuspend(offer)
+        Log.i(TAG, "local offer ready at ${SystemClock.elapsedRealtime() - t0}ms")
 
+        val credential = credentialDeferred.await()
+        Log.i(TAG, "starting postOffer() at ${SystemClock.elapsedRealtime() - t0}ms")
         val answerSdp = withContext(Dispatchers.IO) {
             postOffer(credential.clientSecret, offer.description)
         }
+        Log.i(TAG, "postOffer() returned answer at ${SystemClock.elapsedRealtime() - t0}ms")
         peerConnection.setRemoteDescriptionSuspend(
             SessionDescription(SessionDescription.Type.ANSWER, answerSdp)
         )
+        Log.i(TAG, "setRemoteDescription done at ${SystemClock.elapsedRealtime() - t0}ms")
 
-        return RealtimeConnection(peerConnection, RealtimeEventChannel(dataChannel))
+        RealtimeConnection(peerConnection, RealtimeEventChannel(dataChannel))
     }
 
     private fun postOffer(clientSecret: String, offerSdp: String): String {
@@ -109,6 +128,7 @@ class RealtimeWebRtcClient(
     }
 
     private companion object {
+        const val TAG = "RealtimeWebRtcClient"
         const val REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls"
         const val DATA_CHANNEL_LABEL = "oai-events"
     }
