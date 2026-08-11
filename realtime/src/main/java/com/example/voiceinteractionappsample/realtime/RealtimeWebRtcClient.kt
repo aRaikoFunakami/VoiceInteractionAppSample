@@ -7,8 +7,6 @@ import java.net.URL
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.webrtc.AudioTrack
@@ -56,18 +54,20 @@ class RealtimeWebRtcClient(
     suspend fun connect(
         observer: PeerConnection.Observer,
         localAudioTrack: AudioTrack? = null,
-    ): RealtimeConnection = coroutineScope {
-        // 実機で発見（ユーザー指摘）: credential取得(Broker経由のOpenAIへのネットワーク往復)を
-        // ローカルのWebRTCセットアップ(PeerConnection/track/offer作成)より先に直列で待って
-        // いたため、addTrack()が引き金になるinitPlayoutが本来不要な2秒以上遅れていた —
-        // "スピーカー初期化が遅い"ように見えていたが実際はcredential待ちだった。
-        // credentialが実際に必要なのは最後のpostOffer()だけなので、ここだけ並列に走らせる。
+    ): RealtimeConnection {
+        // コードレビューで発見: 一時期credential取得をローカルのWebRTCセットアップと並列化
+        // していたが (a) 実測でinitPlayout/ICEの遅延はaddTrack()ではなくsetRemoteDescription()
+        // に律速されており並列化の効果が測定上ゼロだったこと (b) credential取得がローカル
+        // セットアップ完了後に失敗すると、生成済みのPeerConnection/DataChannelを閉じる手段が
+        // どこにも無く（connect()にtry/catch/finallyが無く、失敗時はConversationController側
+        // も`connection`フィールドを一切受け取れないためcancel()の掃除対象にできない）
+        // ネイティブリソースがリークすること、の2点から元の逐次順序に戻す。credential取得を
+        // 最初に行うことで、失敗時にWebRTCオブジェクトが一切生成されていない状態を保証する
+        // （このリスクを完全に無くすのが目的で、"順序を入れ替えるだけ"の中途半端な直しだと
+        // このリークは残ったままになる）。各段階の所要時間ログは調査に有用なので維持する。
         val t0 = SystemClock.elapsedRealtime()
-        val credentialDeferred = async {
-            credentialProvider.fetchCredential().also {
-                Log.i(TAG, "credential fetch took ${SystemClock.elapsedRealtime() - t0}ms")
-            }
-        }
+        val credential = credentialProvider.fetchCredential()
+        Log.i(TAG, "credential fetch took ${SystemClock.elapsedRealtime() - t0}ms")
 
         val rtcConfig = PeerConnection.RTCConfiguration(emptyList())
         val peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, observer)
@@ -91,8 +91,6 @@ class RealtimeWebRtcClient(
         peerConnection.setLocalDescriptionSuspend(offer)
         Log.i(TAG, "local offer ready at ${SystemClock.elapsedRealtime() - t0}ms")
 
-        val credential = credentialDeferred.await()
-        Log.i(TAG, "starting postOffer() at ${SystemClock.elapsedRealtime() - t0}ms")
         val answerSdp = withContext(Dispatchers.IO) {
             postOffer(credential.clientSecret, offer.description)
         }
@@ -102,7 +100,7 @@ class RealtimeWebRtcClient(
         )
         Log.i(TAG, "setRemoteDescription done at ${SystemClock.elapsedRealtime() - t0}ms")
 
-        RealtimeConnection(peerConnection, RealtimeEventChannel(dataChannel))
+        return RealtimeConnection(peerConnection, RealtimeEventChannel(dataChannel))
     }
 
     private fun postOffer(clientSecret: String, offerSdp: String): String {
