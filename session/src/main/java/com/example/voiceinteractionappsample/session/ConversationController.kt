@@ -12,6 +12,7 @@ import com.example.voiceinteractionappsample.realtime.RealtimeConnection
 import com.example.voiceinteractionappsample.realtime.RealtimeCredentialProvider
 import com.example.voiceinteractionappsample.realtime.RealtimeEventCodec
 import com.example.voiceinteractionappsample.realtime.RealtimeNoiseReductionConfig
+import com.example.voiceinteractionappsample.realtime.RealtimeUsageCost
 import com.example.voiceinteractionappsample.realtime.RealtimeVadConfig
 import com.example.voiceinteractionappsample.realtime.RealtimeEvent
 import com.example.voiceinteractionappsample.realtime.RealtimeWebRtcClient
@@ -198,8 +199,9 @@ class ConversationController(
         lastActivityAtMs = SystemClock.elapsedRealtime()
         when (val type = event.optString("type", "unknown")) {
             "output_audio_buffer.started" -> _state.update { it.copy(audioOutput = AudioOutputState.PLAYING) }
-            "output_audio_buffer.stopped", "response.done" ->
+            "output_audio_buffer.stopped" ->
                 _state.update { it.copy(audioOutput = AudioOutputState.IDLE, conversation = ConversationState.IDLE) }
+            "response.done" -> onResponseDone(event)
             "input_audio_buffer.speech_started" ->
                 _state.update { it.copy(conversation = ConversationState.USER_SPEAKING) }
             "input_audio_buffer.speech_stopped" ->
@@ -228,6 +230,20 @@ class ConversationController(
             // ツールの存在自体を知らなかった（実機ログで`"tools":[]`を確認）。
             "response.function_call_arguments.done" -> handleFunctionCall(event)
             else -> Unit
+        }
+    }
+
+    /** ユーザー要望: トークン数と推定課金額(USD)をデバッグ表示。usageはresponse.doneにだけ乗る。 */
+    private fun onResponseDone(event: JSONObject) {
+        val usageJson = event.optJSONObject("response")?.optJSONObject("usage")
+        val usage = RealtimeUsageCost.parseUsage(usageJson)
+        _state.update {
+            it.copy(
+                audioOutput = AudioOutputState.IDLE,
+                conversation = ConversationState.IDLE,
+                totalTokens = it.totalTokens + (usage?.totalTokens ?: 0),
+                totalCostUsd = it.totalCostUsd + (usage?.let(RealtimeUsageCost::estimateCostUsd) ?: 0.0),
+            )
         }
     }
 

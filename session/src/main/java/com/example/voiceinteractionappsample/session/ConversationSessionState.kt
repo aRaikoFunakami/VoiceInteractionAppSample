@@ -50,4 +50,8 @@ data class ConversationSessionState(
     val assistantTranscript: String = "",
     /** サーバーVADがAIの発話を割り込みとして打ち切った回数（デバッグ表示用、実機で発見）。 */
     val interruptionCount: Int = 0,
+    /** セッション累計トークン数（デバッグ表示用）。response.doneのusageから積算。 */
+    val totalTokens: Int = 0,
+    /** セッション累計の推定課金額USD（デバッグ表示用）。RealtimeUsageCost参照。 */
+    val totalCostUsd: Double = 0.0,
 )

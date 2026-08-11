@@ -44,6 +44,13 @@ class VoicePlateView @JvmOverloads constructor(
                 append(session.interruptionCount)
                 append("回")
             }
+            if (session.totalTokens > 0) {
+                append("\n\nトークン: ")
+                append(session.totalTokens)
+                append(" (約$")
+                append(String.format("%.4f", session.totalCostUsd))
+                append(")")
+            }
         }
     }
 }
