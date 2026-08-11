@@ -101,7 +101,20 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     }
 
     override fun onShow(args: Bundle?, showFlags: Int) {
+        Log.i(TAG, "onShow() called, showFlags=$showFlags")
         super.onShow(args, showFlags)
+
+        // ユーザー指摘: Googleアシスタントはマイクボタンをもう一度押すとすぐ終了するが、
+        // このアプリはそうならなかった。実機で確認済み: マイクボタンを2回目押した時も
+        // onShow()自体はちゃんと再度呼ばれている（フレームワークが自動でhide()に
+        // 振り替えてはくれない）。つまりトグル判定はアプリ側の責務 — 既に会話が
+        // アクティブな状態でonShow()が来たら「終了しろ」という意図として扱う。
+        if (controller.state.value.connection != ConnectionState.DISCONNECTED) {
+            Log.i(TAG, "onShow() while already active — treating as toggle-to-stop")
+            hide()
+            return
+        }
+
         controller.state.onEach { updateVoicePlate(it) }.launchIn(scope)
         scope.launch {
             try {
@@ -113,6 +126,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     }
 
     override fun onHide() {
+        Log.i(TAG, "onHide() called")
         // 17節: onHide()と完全終了を厳密に区別するにはAAOS上のhide理由取得が必要で未確定
         // （26節）。このサンプルでは簡略化して「hideされたら会話も終える」とする —
         // ponytail: この単純化には天井がある。hide理由（バックグラウンド遷移 vs ユーザーに
