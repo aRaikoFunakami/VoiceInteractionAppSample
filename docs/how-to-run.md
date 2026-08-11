@@ -101,9 +101,27 @@ Voice Plateが左上に表示され、状態（LISTENING/THINKING/SPEAKING/WORKI
 実際のOpenAI Realtime接続の進行に応じて切り替わる。ホストのマイクに向かって話すと、
 アシスタントの音声が返ってくる（実際にMacのスピーカーから聞こえる）。
 
-「Queenのライブ動画を見たい」のようにお願いすると、`open_youtube_search` toolが呼ばれ、
-AAOSの標準機能である Link Viewer（QRコード表示、運転中にブラウザを直接開かせない仕組み）
-が開く。
+「Queenのライブ動画を見たい」のようにお願いすると、`open_youtube_search` toolが呼ばれる。
+
+**⚠️ 事前にChromeを手動でインストールしておくこと。** このAAOSイメージには標準でブラウザ
+が無い（実車と同様の設計）。素の状態で`open_youtube_search`を呼ぶと、AAOS標準のLink
+Viewer（QRコード表示、スマホ側に引き渡す仕組み）に着地する — これはこれで正しい・意図
+された動作だが、実際にアプリ内でページを開く様子を確認したい場合は次の手順でChromeを
+入れる：
+
+```bash
+adb install /path/to/ChromePublic.apk
+adb shell pm enable --user 0  org.chromium.chrome
+adb shell pm enable --user 10 org.chromium.chrome
+```
+
+初回のみ、Chromeの利用規約同意画面が出る（`am start -n org.chromium.chrome/com.google.android.apps.chrome.Main`
+などで一度起動し、画面から同意する — この同意はユーザー自身が行うこと）。以降は
+`open_youtube_search`が実際にChromeでYouTube検索結果を開く。
+
+（実機で確認済み: AAOSは`ACTION_VIEW`の implicit intent 解決からChromeのような一般アプリ
+を除外するため、`OpenYouTubeSearchTool`はコンポーネントを明示指定（`setClassName`）して
+起動している。Chromeが入っていない環境では`NO_HANDLER`になるだけで、クラッシュはしない。）
 
 ## 終了するには（重要）
 
