@@ -8,7 +8,6 @@ import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
@@ -66,15 +65,6 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
 
     override fun onCreateContentView(): View {
         val plate = VoicePlateView(context).also { voicePlateView = it }
-        // ユーザーからのフィードバック: 止める手段が画面上に見えず、課金が心配で画面を
-        // スリープさせる、という誤った回避策を取らせてしまっていた（スリープは接続もmicも
-        // 止めない）。ステータスバーの小さいマイクアイコンの再タップだけに頼らず、常に見える
-        // 終了ボタンをVoice Plate自体に置く。hide()を呼ぶことで既存のonHide() -> cancel()の
-        // 経路をそのまま再利用する — 終了経路を2本持たない。
-        val stopButton = Button(context).apply {
-            text = "STOP"
-            setOnClickListener { hide() }
-        }
         // ユーザー指摘: このウィンドウは背景が透明なまま(TYPE_VOICE_INTERACTIONの既定)で、
         // かつ中身が画面幅いっぱいに伸びていたため、後ろの画面の文字とデバッグ表示が重なって
         // 読みにくかった。Google Assistant自身のUI（丸みのある半透明の吹き出し、画面には
@@ -82,7 +72,6 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(plate)
-            addView(stopButton)
             background = GradientDrawable().apply {
                 setColor(0xE6202124.toInt()) // 濃いグレー、半透明
                 cornerRadius = 32f

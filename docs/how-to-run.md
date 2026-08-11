@@ -125,11 +125,8 @@ adb shell pm enable --user 10 org.chromium.chrome
 
 ## 終了するには（重要）
 
-Voice Plate上の **STOP** ボタンをタップする。これが最も確実。
-
-![STOPボタン](images/stop_button.png)
-
-同じマイクアイコンをもう一度クリックしても止まる。コマンドラインからは:
+ステータスバーのマイクアイコンをもう一度タップする（Googleアシスタントと同じtoggle-to-stop）。
+会話中に再タップすると`hide()`が呼ばれ、確実に終了する。コマンドラインからは:
 
 ```bash
 adb shell cmd voiceinteraction hide
