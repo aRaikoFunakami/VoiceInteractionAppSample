@@ -11,6 +11,7 @@ import com.example.voiceinteractionappsample.audio.WebRtcAudioEngine
 import com.example.voiceinteractionappsample.realtime.RealtimeConnection
 import com.example.voiceinteractionappsample.realtime.RealtimeCredentialProvider
 import com.example.voiceinteractionappsample.realtime.RealtimeEventCodec
+import com.example.voiceinteractionappsample.realtime.RealtimeNoiseReductionConfig
 import com.example.voiceinteractionappsample.realtime.RealtimeVadConfig
 import com.example.voiceinteractionappsample.realtime.RealtimeEvent
 import com.example.voiceinteractionappsample.realtime.RealtimeWebRtcClient
@@ -60,6 +61,7 @@ class ConversationController(
     private val context: Context,
     private val credentialProvider: RealtimeCredentialProvider,
     private val vadConfig: RealtimeVadConfig = RealtimeVadConfig(),
+    private val noiseReductionConfig: RealtimeNoiseReductionConfig = RealtimeNoiseReductionConfig(),
     private val aecMode: AecMode = AecMode.AUTO,
     private val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     private val sessionTimeoutPolicy: SessionTimeoutPolicy = SessionTimeoutPolicy(),
@@ -251,6 +253,9 @@ class ConversationController(
                         "input",
                         JSONObject()
                             .put("turn_detection", vadConfig.toTurnDetectionJson())
+                            // 車内雑音がVADに"発話"として誤検知される対策 — VADより前段で
+                            // サーバー側denoiseをかける（[RealtimeNoiseReductionConfig]参照）。
+                            .put("noise_reduction", noiseReductionConfig.toJson())
                             // ユーザー要望2: 英語しか認識しない対策 — STTに言語をヒントする。
                             .put(
                                 "transcription",
