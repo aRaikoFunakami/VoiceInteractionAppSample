@@ -1,6 +1,5 @@
 package com.example.voiceinteractionappsample.realtime
 
-import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
@@ -26,7 +25,7 @@ class HttpRealtimeCredentialProvider(
             setRequestProperty("Content-Type", "application/json")
         }
         try {
-            connection.outputStream.use { it.writeEmptyJsonBody() }
+            connection.outputStream.use { it.write("{}".toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
             if (status !in 200..299) {
                 val error = connection.errorStream?.bufferedReader()?.readText().orEmpty()
@@ -41,9 +40,5 @@ class HttpRealtimeCredentialProvider(
         } finally {
             connection.disconnect()
         }
-    }
-
-    private fun OutputStream.writeEmptyJsonBody() {
-        write("{}".toByteArray(Charsets.UTF_8))
     }
 }
