@@ -141,7 +141,7 @@ class ConversationController(
         val track = factory.createAudioTrack("mic0", source)
         localAudioTrack = track
 
-        val client = RealtimeWebRtcClient(factory, credentialProvider)
+        val client = RealtimeWebRtcClient(factory, credentialProvider, realtimeCallsUrl)
         val newConnection = client.connect(this, track)
         connection = newConnection
         newConnection.events.send(buildSessionUpdateEvent())

@@ -33,8 +33,23 @@ class ServerSettingsActivity : AppCompatActivity() {
             } else {
                 RealtimeServerMode.OPENAI
             }
-            settings.localHost = localHost.text.toString().ifBlank { settings.localHost }
+            // issue #43: RealtimeServerSettings interpolates this straight into "http://$host:port/...".
+            // Users are likely to paste a full URL they saw in a server's own startup log (e.g.
+            // "http://10.0.2.2:8765") rather than typing a bare host — strip scheme/path/port so
+            // that doesn't produce a malformed double-port URL. Blank input leaves the saved host
+            // untouched rather than writing a no-op self-assignment back to it.
+            val sanitizedHost = sanitizeHost(localHost.text.toString())
+            if (sanitizedHost.isNotEmpty()) {
+                settings.localHost = sanitizedHost
+            }
             Toast.makeText(this, R.string.server_settings_saved, Toast.LENGTH_SHORT).show()
         }
     }
+
+    private fun sanitizeHost(input: String): String =
+        input.trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .substringBefore("/")
+            .substringBefore(":")
 }
