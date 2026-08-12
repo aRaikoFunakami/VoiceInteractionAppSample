@@ -13,6 +13,9 @@ AAOS には、Google Assistant の代わりに自作のアプリを既定の音�
 - function calling による YouTube 動画検索（`open_youtube_search`）— Chrome を明示起動して検索結果を開く
 - セッション累計のトークン数・推定課金額(USD)をデバッグ表示
 - アイドルタイムアウト・最大セッション時間による課金の歯止め
+- 設定画面（Settings > Assistant & voice の歯車アイコン）から OpenAI Realtime ⇄ ローカル
+  サーバー（`local_realtime_llm` 等）を再ビルド不要で切り替え可能（手順は
+  [docs/how-to-run.md](docs/how-to-run.md) の「接続先サーバーを切り替える」を参照）
 
 ## アーキテクチャ
 

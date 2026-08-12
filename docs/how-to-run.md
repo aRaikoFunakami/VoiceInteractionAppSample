@@ -30,7 +30,7 @@ python3 backend/local_broker.py
 Android Studioの **Run** ボタンでも同じことができる。ただしRunは唯一のランチャー画面
 （`DiagnosticsActivity`、診断画面）を自動起動するだけで、音声アシスタント本体は起動しない
 ——それは通常のActivityではなく `VoiceInteractionService` なので、Run/デバッグの対象には
-ならない。起動方法はステップ5を参照。
+ならない。起動方法はステップ6を参照。
 
 ## 3. マイク権限を付与する（AAOSは複数ユーザー — 全ユーザーに付与する）
 
@@ -48,12 +48,14 @@ adb shell am force-stop com.example.voiceinteractionappsample
 ## 4. 既定のVoice Interaction Appとして登録する
 
 **GUIから（実機検証済み・こちらでOK）**: Settings > Assistant & voice > 「Digital assistant
-app」の**行のテキスト部分**をタップ（右端の歯車アイコンはGoogle Assistant自身の設定に
-飛ぶだけで無関係・ハマりどころ）→ ピッカーで「VoiceInteractionAppSample」のラジオボタンを
+app」の**行のテキスト部分**をタップ → ピッカーで「VoiceInteractionAppSample」のラジオボタンを
 タップ → **直後に出る確認ダイアログ（「The assistant will be able to read information
 about apps...」）で必ずOKを押す**。ラジオボタンをタップしただけではまだ確定しない —
 このダイアログでキャンセル/離脱すると選択前の状態に戻る。OKまで押せば
 `voice_interaction_service`と`assistant`ロールの両方が正しく切り替わることを確認済み。
+（この行の右端に出る歯車アイコンはこのアプリ自身の接続先サーバー設定に飛ぶ — 手順5参照。
+Issue #43より前は`settingsActivity`未設定でGoogle Assistant自身の設定に飛んでいたが、
+現在は無関係ではない。）
 
 **⚠️ OKを押した後、画面を出入りすると「Digital assistant app: None」と表示されることが
 ある** — これはCar Settings UI側の表示バグで、実体は壊れていない（実機検証済み:
@@ -74,7 +76,44 @@ RECORD_AUDIO権限は消えない — `voice_interaction_service`のsecure setti
 される、実機検証で確認済み）。コールドブート後はGUIかadbのどちらかで選び直すこと。
 Settings > Assistant & voice の「Voice input」行が消えていたらこれが原因。
 
-## 5. 会話を始める
+## 5. 接続先サーバーを切り替える（OpenAI ⇄ ローカル、任意）
+
+デフォルトはOpenAI Realtime（`backend/local_broker.py`向け）。`local_realtime_llm`のような
+ローカルサーバーに向けたい場合、再ビルド不要で設定画面から切り替えられる（Issue #43）。
+
+**GUIから（実機検証済み）**: 手順4で「Digital assistant app」にこのアプリを選択済みの状態
+にした上で、**同じ行の右端に出る歯車アイコン**をタップ →「Realtime Server」画面が開く。
+OpenAI Realtime / Local のどちらかを選び、Local選択時はローカルサーバーのホスト（例:
+`10.0.2.2`、AVDからホストPCを指す予約アドレス）を入力してSAVE。
+
+**adbから直接開く**（歯車を探さず一発で確認したいとき）:
+
+```bash
+adb shell am start -n com.example.voiceinteractionappsample/.ServerSettingsActivity
+```
+
+**⚠️ 歯車アイコンが出ない場合、まず端末に入っているAPKが最新かを疑う。** 歯車は
+「`android:supportsAssist=true`」「`android:settingsActivity`が設定済み」「このアプリが
+実際にDigital assistant appとして選択済み」の3条件が揃って初めて表示される — コードを
+直しても、端末に入っているAPKが古い（再ビルド前の）ままだと出ない（実機で発見:
+`ServerSettingsActivity`追加直後、再ビルドせず動作確認しようとして再現した）。疑わしい
+ときは対象アプリのコンポーネント一覧に出ているか確認する:
+
+```bash
+adb shell dumpsys package com.example.voiceinteractionappsample | grep ServerSettingsActivity
+```
+
+何も出なければ古いAPKのまま。再ビルドして入れ直す:
+
+```bash
+./gradlew :app:assembleDebug -q
+```
+
+```bash
+adb install -r -d app/build/outputs/apk/debug/app-debug.apk
+```
+
+## 6. 会話を始める
 
 **Android Studio / エミュレータ画面から（推奨）**: エミュレータ画面右下、音量調整の右にある
 **マイクアイコンをクリック**する。物理PTTボタンの代わりにこれがトリガーになっている
@@ -136,7 +175,7 @@ adb shell cmd voiceinteraction hide
 させるのは効果が無い（実際に確認済み — スリープ中もマイクは録音を続け、WebRTC接続も
 生きたままだった）。必ず上記のいずれかの方法で明示的に終了させること。
 
-## 6. 診断画面（任意）
+## 7. 診断画面（任意）
 
 ```bash
 adb shell am start -n com.example.voiceinteractionappsample/com.example.voiceinteractionappsample.diagnostics.DiagnosticsActivity
