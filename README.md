@@ -2,7 +2,7 @@
 
 Android Automotive OS (AAOS) 向けの Voice Interaction App (VIA) サンプル。バックエンドに OpenAI Realtime API を WebRTC 経由で接続し、日本語で会話しながら車載アシスタントとして振る舞う。
 
-![「フリーレンの動画を検索して」と話しかけ、YouTube検索結果が開いた状態](docs/blog/images/demo-youtube-search.png)
+![「フリーレンの動画を検索して」と話しかけ、YouTube検索結果が開いた状態](docs/images/demo-youtube-search.png)
 
 ## これは何か
 
@@ -14,13 +14,11 @@ AAOS には、Google Assistant の代わりに自作のアプリを既定の音�
 - セッション累計のトークン数・推定課金額(USD)をデバッグ表示
 - アイドルタイムアウト・最大セッション時間による課金の歯止め
 
-実装の詳細（ソースコード単位の解説、WebRTC接続シーケンス、実測した接続待ち時間など）は [docs/blog/via-sample-blog.md](docs/blog/via-sample-blog.md) にまとめてある。
-
 ## アーキテクチャ
 
 `:via :realtime :audio :tools :session :diagnostics` の6モジュールに分かれている。呼び出しは `:app → :via → :session → {:realtime, :audio, :tools}` の一本道で、`:diagnostics` だけは実行系列に入らず全モジュールを横断参照する起動時セルフチェック画面になっている。
 
-![モジュール構成。app→via→sessionが縦の呼び出し系列で、sessionがrealtime/audio/toolsを合成する。](docs/blog/images/architecture.png)
+![モジュール構成。app→via→sessionが縦の呼び出し系列で、sessionがrealtime/audio/toolsを合成する。](docs/images/architecture.png)
 
 | モジュール | 役割 |
 |---|---|
@@ -50,13 +48,12 @@ AAOS Emulator を既定の Voice Interaction App として登録し、マイク�
 
 ## 既知の制約
 
-- PTT を押してから実際に会話できるまで、WebRTC 接続確立（credential取得・SDP交換・ICE/DTLS）に実測 2.4〜6.0 秒かかる（[docs/blog/via-sample-blog.md#ユーザビリティの制約](docs/blog/via-sample-blog.md#ユーザビリティの制約) 参照）。この待ち時間短縮は [Issue #41](https://github.com/aRaikoFunakami/VoiceInteractionAppSample/issues/41) で設計を検討中。
+- PTT を押してから実際に会話できるまで、WebRTC 接続確立（credential取得・SDP交換・ICE/DTLS）に実測 2.4〜6.0 秒かかる。この待ち時間短縮は [Issue #41](https://github.com/aRaikoFunakami/VoiceInteractionAppSample/issues/41) で設計を検討中。
 - Session Broker は認証方式が未確定（[docs/broker-contract.md](docs/broker-contract.md)）。実 Broker を実装する際はここから着手する必要がある。
 - AEC の合否判定は未確定（[docs/aec-device-profiles.md](docs/aec-device-profiles.md)、実車評価待ち）。
 
 ## ドキュメント
 
-- [docs/blog/via-sample-blog.md](docs/blog/via-sample-blog.md) — 実装の解説記事（一次情報へのリンク、接続シーケンス、実測データを含む）
 - [docs/how-to-run.md](docs/how-to-run.md) — AAOS Emulator での動かし方
 - [docs/dev-plan.md](docs/dev-plan.md) — 開発計画（Phase 0〜10、確定事項）
 - [docs/broker-contract.md](docs/broker-contract.md) — Session Broker 連携契約
