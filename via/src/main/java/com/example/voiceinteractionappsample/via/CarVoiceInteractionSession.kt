@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
+import com.example.voiceinteractionappsample.realtime.RealtimeServerSettings
 import com.example.voiceinteractionappsample.session.AudioInputState
 import com.example.voiceinteractionappsample.session.AudioOutputState
 import com.example.voiceinteractionappsample.session.ConnectionState
@@ -49,9 +50,13 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     // 実機で発見（"ツールを呼び出せない"）: スキーマ・実行パイプライン自体はPhase 8-9で
     // 作って個別にテスト済みだったが、ConversationControllerへの配線が漏れていた
     // （session.updateの`tools`が常に空配列のままサーバーに送られていた）。
+    // issue #43: read fresh each time a session is created, so a setting change in
+    // ServerSettingsActivity takes effect on the next PTT press without an app restart.
+    private val serverSettings = RealtimeServerSettings(context)
     private val controller = ConversationController(
         context = context,
-        credentialProvider = HttpRealtimeCredentialProvider(LOCAL_BROKER_URL),
+        credentialProvider = HttpRealtimeCredentialProvider(serverSettings.brokerUrl),
+        realtimeCallsUrl = serverSettings.realtimeCallsUrl,
         toolSchemas = JSONArray().put(OpenYouTubeSearchToolSchema.toJson()),
         toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
         onAutoTerminated = { reason ->
@@ -141,7 +146,5 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
 
     private companion object {
         const val TAG = "CarVoiceInteractionSession"
-        // AVD限定 (10.0.2.2 = host loopback)。実機/実Brokerでは差し替える。
-        const val LOCAL_BROKER_URL = "http://10.0.2.2:8787/api/realtime/session"
     }
 }
