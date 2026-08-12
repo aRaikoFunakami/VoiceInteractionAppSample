@@ -40,6 +40,7 @@ android {
 dependencies {
     implementation(project(":via"))
     implementation(project(":diagnostics"))
+    implementation(project(":realtime")) // ServerSettingsActivity (issue #43)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)

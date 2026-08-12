@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
+import com.example.voiceinteractionappsample.realtime.RealtimeServerSettings
 import com.example.voiceinteractionappsample.session.AudioInputState
 import com.example.voiceinteractionappsample.session.AudioOutputState
 import com.example.voiceinteractionappsample.session.ConnectionState
@@ -49,19 +50,30 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     // 実機で発見（"ツールを呼び出せない"）: スキーマ・実行パイプライン自体はPhase 8-9で
     // 作って個別にテスト済みだったが、ConversationControllerへの配線が漏れていた
     // （session.updateの`tools`が常に空配列のままサーバーに送られていた）。
-    private val controller = ConversationController(
-        context = context,
-        credentialProvider = HttpRealtimeCredentialProvider(LOCAL_BROKER_URL),
-        toolSchemas = JSONArray().put(OpenYouTubeSearchToolSchema.toJson()),
-        toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
-        onAutoTerminated = { reason ->
-            // 実機で発見: watchdogは正しくRTC/micを止めていたが、誰もVoice Plateを隠さない
-            // ため画面だけが古い状態のまま残っていた。self-terminate側からもhide()を呼ぶ。
-            // onAutoTerminatedはバックグラウンドディスパッチャから呼ばれるのでMainへ渡す。
-            Log.i(TAG, "auto-terminated: $reason — hiding Voice Plate")
-            scope.launch { hide() }
-        },
-    )
+    // issue #43: rebuilt in onShow() (not just once here at construction) — this session
+    // instance can live across many show/hide cycles (onHide() never calls finish()), so
+    // reading RealtimeServerSettings only at construction would freeze whichever server was
+    // configured when the session was first created, instead of the setting taking effect
+    // on the next PTT press as intended.
+    private var controller = createController()
+
+    private fun createController(): ConversationController {
+        val serverSettings = RealtimeServerSettings(context)
+        return ConversationController(
+            context = context,
+            credentialProvider = HttpRealtimeCredentialProvider(serverSettings.brokerUrl),
+            realtimeCallsUrl = serverSettings.realtimeCallsUrl,
+            toolSchemas = JSONArray().put(OpenYouTubeSearchToolSchema.toJson()),
+            toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
+            onAutoTerminated = { reason ->
+                // 実機で発見: watchdogは正しくRTC/micを止めていたが、誰もVoice Plateを隠さない
+                // ため画面だけが古い状態のまま残っていた。self-terminate側からもhide()を呼ぶ。
+                // onAutoTerminatedはバックグラウンドディスパッチャから呼ばれるのでMainへ渡す。
+                Log.i(TAG, "auto-terminated: $reason — hiding Voice Plate")
+                scope.launch { hide() }
+            },
+        )
+    }
 
     override fun onCreateContentView(): View {
         val plate = VoicePlateView(context).also { voicePlateView = it }
@@ -104,6 +116,8 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
             return
         }
 
+        // issue #43: fresh RealtimeServerSettings read for every PTT press (see createController()).
+        controller = createController()
         controller.state.onEach { updateVoicePlate(it) }.launchIn(scope)
         scope.launch {
             try {
@@ -141,7 +155,5 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
 
     private companion object {
         const val TAG = "CarVoiceInteractionSession"
-        // AVD限定 (10.0.2.2 = host loopback)。実機/実Brokerでは差し替える。
-        const val LOCAL_BROKER_URL = "http://10.0.2.2:8787/api/realtime/session"
     }
 }

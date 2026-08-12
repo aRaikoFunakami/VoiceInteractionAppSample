@@ -42,6 +42,9 @@ data class RealtimeConnection(
 class RealtimeWebRtcClient(
     private val peerConnectionFactory: PeerConnectionFactory,
     private val credentialProvider: RealtimeCredentialProvider,
+    // issue #43: configurable so callers can point at a local Realtime-compatible server
+    // instead of OpenAI's. Defaults keep every existing call site unchanged.
+    private val realtimeCallsUrl: String = DEFAULT_REALTIME_CALLS_URL,
 ) {
     /**
      * @param localAudioTrack Captured via WebRtcAudioEngine's AudioDeviceModule — this class
@@ -104,7 +107,7 @@ class RealtimeWebRtcClient(
     }
 
     private fun postOffer(clientSecret: String, offerSdp: String): String {
-        val connection = (URL(REALTIME_CALLS_URL).openConnection() as HttpURLConnection).apply {
+        val connection = (URL(realtimeCallsUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
             connectTimeout = 15_000
@@ -125,10 +128,10 @@ class RealtimeWebRtcClient(
         }
     }
 
-    private companion object {
-        const val TAG = "RealtimeWebRtcClient"
-        const val REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls"
-        const val DATA_CHANNEL_LABEL = "oai-events"
+    companion object {
+        const val DEFAULT_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls"
+        private const val TAG = "RealtimeWebRtcClient"
+        private const val DATA_CHANNEL_LABEL = "oai-events"
     }
 }
 

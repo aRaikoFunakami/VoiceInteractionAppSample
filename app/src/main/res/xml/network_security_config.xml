@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- AVD限定: backend/local_broker.py はデモ用でHTTPS非対応。10.0.2.2はAndroid Emulatorが
-         ホストPCのlocalhostを指す予約アドレス。実機/実Brokerでは使わない前提。 -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">10.0.2.2</domain>
-    </domain-config>
+    <!-- issue #43: RealtimeServerSettingsのLocalモードは実行時に入力されたホスト(LAN IP等)へ
+         接続するため、ビルド時固定のdomain-config(単一ドメインの許可リスト)ではカバーできない。
+         backend/local_broker.py・local_realtime_llmはどちらもローカル開発用でHTTPS非対応が前提
+         のサーバーであり、本アプリが平文で通信する先はこの2つのみ(OpenAI本体はHTTPS、WebRTC
+         メディア/DataChannelはこの設定と無関係にDTLS/SRTPで保護される)。 -->
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

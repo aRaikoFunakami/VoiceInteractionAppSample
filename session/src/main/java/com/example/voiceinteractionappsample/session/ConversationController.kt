@@ -61,6 +61,8 @@ enum class DisconnectReason { USER_CANCEL, NETWORK_LOST, HIDE_COMPLETE, ERROR, I
 class ConversationController(
     private val context: Context,
     private val credentialProvider: RealtimeCredentialProvider,
+    // issue #43: lets callers point WebRTC SDP exchange at a local Realtime-compatible server.
+    private val realtimeCallsUrl: String = RealtimeWebRtcClient.DEFAULT_REALTIME_CALLS_URL,
     private val vadConfig: RealtimeVadConfig = RealtimeVadConfig(),
     private val noiseReductionConfig: RealtimeNoiseReductionConfig = RealtimeNoiseReductionConfig(),
     private val aecMode: AecMode = AecMode.AUTO,
@@ -139,7 +141,7 @@ class ConversationController(
         val track = factory.createAudioTrack("mic0", source)
         localAudioTrack = track
 
-        val client = RealtimeWebRtcClient(factory, credentialProvider)
+        val client = RealtimeWebRtcClient(factory, credentialProvider, realtimeCallsUrl)
         val newConnection = client.connect(this, track)
         connection = newConnection
         newConnection.events.send(buildSessionUpdateEvent())
