@@ -7,4 +7,5 @@
     <string name="server_settings_local_host_hint">Local server host, e.g. 10.0.2.2</string>
     <string name="server_settings_save">Save</string>
     <string name="server_settings_saved">Saved</string>
+    <string name="server_settings_saved_models_missing">Saved (models not pushed yet — run scripts/fetch_*.sh)</string>
 </resources>

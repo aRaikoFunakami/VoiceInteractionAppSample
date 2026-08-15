@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import com.example.voiceinteractionappsample.localagent.LocalAgentController
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
 import com.example.voiceinteractionappsample.realtime.RealtimeServerMode
 import com.example.voiceinteractionappsample.realtime.RealtimeServerSettings
@@ -28,12 +29,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
@@ -71,8 +68,14 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     private fun createController(): VoiceSessionController {
         val serverSettings = RealtimeServerSettings(context)
         if (serverSettings.mode == RealtimeServerMode.LOCAL_AGENT) {
-            // issue #48 で LocalAgentController に差し替える
-            return UnimplementedLocalAgentController()
+            // issue #48: 完全オンデバイスの local voice agent。ツールは #50 で接続する。
+            return LocalAgentController(
+                context = context,
+                onAutoTerminated = { reason ->
+                    Log.i(TAG, "local agent auto-terminated: $reason — hiding Voice Plate")
+                    scope.launch { hide() }
+                },
+            )
         }
         return ConversationController(
             context = context,
@@ -180,27 +183,5 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
 
     private companion object {
         const val TAG = "CarVoiceInteractionSession"
-    }
-}
-
-/**
- * LOCAL_AGENT モードの一時スタブ (issue #47)。PTT すると ERROR プレートに未実装である旨を表示する。
- * issue #48 で :localagent の LocalAgentController に置き換える。
- */
-private class UnimplementedLocalAgentController : VoiceSessionController {
-    private val _state = MutableStateFlow(ConversationSessionState())
-    override val state: StateFlow<ConversationSessionState> = _state.asStateFlow()
-
-    override suspend fun start() {
-        _state.update {
-            it.copy(
-                connection = ConnectionState.FAILED,
-                assistantTranscript = "Local Voice Agent は未実装です(issue #48 で対応)",
-            )
-        }
-    }
-
-    override suspend fun cancel(reason: DisconnectReason) {
-        _state.value = ConversationSessionState()
     }
 }
