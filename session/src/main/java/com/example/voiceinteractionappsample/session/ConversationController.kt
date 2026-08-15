@@ -88,7 +88,7 @@ class ConversationController(
      * touches UI (that's exactly what [CarVoiceInteractionSession] does here).
      */
     private val onAutoTerminated: (DisconnectReason) -> Unit = {},
-) : PeerConnection.Observer {
+) : PeerConnection.Observer, VoiceSessionController {
 
     private var reconnectAttempt = 0
     private var watchdogJob: Job? = null
@@ -98,7 +98,7 @@ class ConversationController(
     @Volatile private var lastActivityAtMs = 0L
 
     private val _state = MutableStateFlow(ConversationSessionState())
-    val state: StateFlow<ConversationSessionState> = _state.asStateFlow()
+    override val state: StateFlow<ConversationSessionState> = _state.asStateFlow()
 
     private val scope = CoroutineScope(SupervisorJob())
     private var eventCollectionJob: Job? = null
@@ -110,7 +110,7 @@ class ConversationController(
     private var connection: RealtimeConnection? = null
     private var audioFocusRequest: AudioFocusRequest? = null
 
-    suspend fun start() {
+    override suspend fun start() {
         if (_state.value.connection != ConnectionState.DISCONNECTED) return // already starting/started
 
         _state.update { it.copy(connection = ConnectionState.CONNECTING) }
@@ -289,7 +289,8 @@ class ConversationController(
      * DataChannel close -> PeerConnection close -> AudioDeviceModule release -> audio focus
      * release。Voice Plate hideはここに含めない（:viaの責務）。
      */
-    suspend fun cancel(reason: DisconnectReason = DisconnectReason.USER_CANCEL) {
+    // デフォルト引数は VoiceSessionController 側で宣言済み(override では再宣言できない)。
+    override suspend fun cancel(reason: DisconnectReason) {
         if (_state.value.connection == ConnectionState.DISCONNECTED && connection == null) return
 
         Log.i(TAG, "cancel: reason=$reason")

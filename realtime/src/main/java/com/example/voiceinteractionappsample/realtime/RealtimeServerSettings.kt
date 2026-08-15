@@ -2,8 +2,11 @@ package com.example.voiceinteractionappsample.realtime
 
 import android.content.Context
 
-/** Which Realtime backend to connect to (issue #43). */
-enum class RealtimeServerMode { OPENAI, LOCAL }
+/**
+ * Which backend to connect to (issue #43, #47).
+ * [LOCAL_AGENT] は完全オンデバイスの local voice agent (issue #48) — サーバー URL を持たない。
+ */
+enum class RealtimeServerMode { OPENAI, LOCAL, LOCAL_AGENT }
 
 /**
  * Persists the server-switch setting so it survives app restarts without a rebuild (issue #43).
@@ -31,12 +34,14 @@ class RealtimeServerSettings(context: Context) {
         get() = when (mode) {
             RealtimeServerMode.OPENAI -> "http://$AVD_HOST_LOOPBACK:8787/api/realtime/session"
             RealtimeServerMode.LOCAL -> "http://$localHost:8787/api/realtime/session"
+            RealtimeServerMode.LOCAL_AGENT -> "" // オンデバイス動作のためサーバー不要 (#47)
         }
 
     val realtimeCallsUrl: String
         get() = when (mode) {
             RealtimeServerMode.OPENAI -> RealtimeWebRtcClient.DEFAULT_REALTIME_CALLS_URL
             RealtimeServerMode.LOCAL -> "http://$localHost:8765/v1/realtime/calls"
+            RealtimeServerMode.LOCAL_AGENT -> "" // 同上
         }
 
     private companion object {

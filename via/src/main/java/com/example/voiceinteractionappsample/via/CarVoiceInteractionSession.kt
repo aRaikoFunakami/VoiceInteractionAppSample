@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.example.voiceinteractionappsample.realtime.HttpRealtimeCredentialProvider
+import com.example.voiceinteractionappsample.realtime.RealtimeServerMode
 import com.example.voiceinteractionappsample.realtime.RealtimeServerSettings
 import com.example.voiceinteractionappsample.session.AudioInputState
 import com.example.voiceinteractionappsample.session.AudioOutputState
@@ -18,14 +19,21 @@ import com.example.voiceinteractionappsample.session.ConnectionState
 import com.example.voiceinteractionappsample.session.ConversationController
 import com.example.voiceinteractionappsample.session.ConversationSessionState
 import com.example.voiceinteractionappsample.session.ConversationState
+import com.example.voiceinteractionappsample.session.DisconnectReason
+import com.example.voiceinteractionappsample.session.VoiceSessionController
 import com.example.voiceinteractionappsample.tools.DeviceToolExecutor
 import com.example.voiceinteractionappsample.tools.OpenYouTubeSearchTool
 import com.example.voiceinteractionappsample.tools.OpenYouTubeSearchToolSchema
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
@@ -56,9 +64,16 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     // configured when the session was first created, instead of the setting taking effect
     // on the next PTT press as intended.
     private var controller = createController()
+    // issue #47: onShow()ごとに launchIn していた state コレクタが解放されず PTT のたびに
+    // 増えていた(旧コレクタは破棄済み controller を監視し続ける)。Job を保持して張り替える。
+    private var stateJob: Job? = null
 
-    private fun createController(): ConversationController {
+    private fun createController(): VoiceSessionController {
         val serverSettings = RealtimeServerSettings(context)
+        if (serverSettings.mode == RealtimeServerMode.LOCAL_AGENT) {
+            // issue #48 で LocalAgentController に差し替える
+            return UnimplementedLocalAgentController()
+        }
         return ConversationController(
             context = context,
             credentialProvider = HttpRealtimeCredentialProvider(serverSettings.brokerUrl),
@@ -110,7 +125,12 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
         // onShow()自体はちゃんと再度呼ばれている（フレームワークが自動でhide()に
         // 振り替えてはくれない）。つまりトグル判定はアプリ側の責務 — 既に会話が
         // アクティブな状態でonShow()が来たら「終了しろ」という意図として扱う。
-        if (controller.state.value.connection != ConnectionState.DISCONNECTED) {
+        // issue #47: FAILED は「アクティブ」扱いにしない。FAILED のまま latch すると次の PTT が
+        // 「停止」として消費され、再試行に 2 回の押下が必要になる(start() が例外で抜けた場合の
+        // 既存 OpenAI パスにも同じ問題があった)。FAILED なら新しい controller で再試行する。
+        if (controller.state.value.connection !in
+            setOf(ConnectionState.DISCONNECTED, ConnectionState.FAILED)
+        ) {
             Log.i(TAG, "onShow() while already active — treating as toggle-to-stop")
             hide()
             return
@@ -118,12 +138,17 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
 
         // issue #43: fresh RealtimeServerSettings read for every PTT press (see createController()).
         controller = createController()
-        controller.state.onEach { updateVoicePlate(it) }.launchIn(scope)
+        stateJob?.cancel()
+        stateJob = controller.state.onEach { updateVoicePlate(it) }.launchIn(scope)
         scope.launch {
             try {
                 controller.start()
             } catch (e: Exception) {
+                Log.w(TAG, "controller.start() failed", e)
                 voicePlateView?.render(VoicePlateState.ERROR, ConversationSessionState())
+                // issue #47: 例外で抜けると state が CONNECTING のまま残り、次の PTT が
+                // toggle-to-stop に化けて再試行に 2 回かかる。cancel() で DISCONNECTED に戻す。
+                runCatching { controller.cancel(DisconnectReason.ERROR) }
             }
         }
     }
@@ -155,5 +180,27 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
 
     private companion object {
         const val TAG = "CarVoiceInteractionSession"
+    }
+}
+
+/**
+ * LOCAL_AGENT モードの一時スタブ (issue #47)。PTT すると ERROR プレートに未実装である旨を表示する。
+ * issue #48 で :localagent の LocalAgentController に置き換える。
+ */
+private class UnimplementedLocalAgentController : VoiceSessionController {
+    private val _state = MutableStateFlow(ConversationSessionState())
+    override val state: StateFlow<ConversationSessionState> = _state.asStateFlow()
+
+    override suspend fun start() {
+        _state.update {
+            it.copy(
+                connection = ConnectionState.FAILED,
+                assistantTranscript = "Local Voice Agent は未実装です(issue #48 で対応)",
+            )
+        }
+    }
+
+    override suspend fun cancel(reason: DisconnectReason) {
+        _state.value = ConversationSessionState()
     }
 }
