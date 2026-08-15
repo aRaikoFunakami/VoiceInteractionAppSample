@@ -171,6 +171,7 @@ class LocalAgentController(
                 )
             }
             watchdogJob = scope.launch { watchdogLoop() }
+            LocalAgentRuntime.sessionActive = true // onTrimMemory の解放をセッション中は抑止
             Log.i(TAG, "local agent session started (timeout=$sessionTimeoutPolicy)")
         }
     }
@@ -199,6 +200,7 @@ class LocalAgentController(
             val renderJoined = safelyOr("render stop", fallback = false) { render.stop() }
             safely("capture stop") { capture.stop(destroyEngine = renderJoined) }
             safely("abandon audio focus") { abandonAudioFocus() }
+            LocalAgentRuntime.sessionActive = false
             _state.value = ConversationSessionState()
             if (reason != DisconnectReason.USER_CANCEL) {
                 safely("onAutoTerminated") { onAutoTerminated(reason) }

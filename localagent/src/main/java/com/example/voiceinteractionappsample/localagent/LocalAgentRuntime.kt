@@ -62,4 +62,30 @@ object LocalAgentRuntime {
     fun cancelInference() {
         if (initDeferred?.isCompleted == true) llm.cancelActive()
     }
+
+    /** セッションがアクティブか(LocalAgentController が start/cancel で更新)。 */
+    @Volatile var sessionActive: Boolean = false
+        internal set
+
+    /**
+     * メモリ逼迫時の解放パス(issue #49, 計画書 §3.4)。セッション非アクティブ時のみ
+     * LLM(常駐 ~数 GB)を解放し、次回 ensureInitialized() でクリーンに再ロードさせる。
+     * LMK に強制終了されるより能動的に手放す方が安全。STT/TTS(~360MB)は再ロードが
+     * 速いので保持したままにする。
+     */
+    fun onTrimMemory(level: Int) {
+        if (sessionActive) return
+        // 実機で確認: VoiceInteractionService にバインドされたプロセスは常時 foreground 扱いで、
+        // BACKGROUND/COMPLETE 系のレベルは配信されない(send-trim-memory も
+        // "Unable to set a background trim level on a foreground process" で拒否される)。
+        // foreground プロセス向けの RUNNING_CRITICAL(15) 以上で解放しないと、この解放パスは
+        // 実質永久に発火しない。
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+            val d = initDeferred ?: return
+            if (!d.isCompleted) return // ロード中に close すると native 競合(初回 PTT 中は触らない)
+            android.util.Log.i("LocalAgentRuntime", "onTrimMemory($level): releasing LLM")
+            initDeferred = null
+            llm.close()
+        }
+    }
 }
