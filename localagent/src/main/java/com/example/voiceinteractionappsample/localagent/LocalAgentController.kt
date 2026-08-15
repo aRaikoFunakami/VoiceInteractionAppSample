@@ -329,12 +329,24 @@ class LocalAgentController(
         lastActivityAtMs = nowMs
     }
 
-    /** 前提チェック失敗: FAILED + 理由を表示したまま残す(#47 のガード修正により次の PTT で再試行可)。 */
+    /**
+     * 前提チェック失敗。実装バグ(issue #61)の修正: 計画書 §3.5 で書いた設計
+     * 「FAILED にしたら onAutoTerminated を呼んで自動的に畳む」を実装し忘れており、
+     * FAILED のまま Voice Plate のオーバーレイが永久に残って画面操作をブロックしていた
+     * (#47 のガード修正は「次の PTT で再試行できる」ことしか保証せず、PTT を押さない限り
+     * 画面が固まったままなのは直っていなかった)。
+     *
+     * ここでは state を FAILED にして理由を一瞬表示したあと、既存の cancel() 経路
+     * (onAutoTerminated → :via の hide() → onHide() → cancel(USER_CANCEL))に乗せて
+     * 自動的に片付ける。cancel() 側の各ステップは safely{} で保護済み・冪等なので、
+     * capture/render/focus のどこまで進んでいたかに関わらず安全に呼べる。
+     */
     private fun fail(message: String) {
         Log.w(TAG, "start failed: $message")
         _state.update {
             it.copy(connection = ConnectionState.FAILED, assistantTranscript = message)
         }
+        onAutoTerminated(DisconnectReason.ERROR)
     }
 
     private fun requestAudioFocus(): Boolean {
