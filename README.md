@@ -16,10 +16,14 @@ AAOS には、Google Assistant の代わりに自作のアプリを既定の音�
 - 設定画面（Settings > Assistant & voice の歯車アイコン）から OpenAI Realtime ⇄ ローカル
   サーバー（`local_realtime_llm` 等）を再ビルド不要で切り替え可能（手順は
   [docs/how-to-run.md](docs/how-to-run.md) の「接続先サーバーを切り替える」を参照）
+- **完全オンデバイスの Local Voice Agent モード**（サーバー・APIキー・ネットワーク不要）。
+  SenseVoice STT + Gemma 4 E2B (LiteRT-LM) + supertonic-3-ja TTS + WebRTC APM(AEC3) を
+  デバイス内で動かし、barge-in と YouTube 検索ツールコールまで同じ Voice Plate 上で動作する
+  （セットアップは [docs/how-to-run.md](docs/how-to-run.md) の「Local Voice Agent」を参照）
 
 ## アーキテクチャ
 
-`:via :realtime :audio :tools :session :diagnostics` の6モジュールに分かれている。呼び出しは `:app → :via → :session → {:realtime, :audio, :tools}` の一本道で、`:diagnostics` だけは実行系列に入らず全モジュールを横断参照する起動時セルフチェック画面になっている。
+`:via :realtime :audio :tools :session :localagent :diagnostics` の7モジュールに分かれている。会話バックエンドは `VoiceSessionController` インターフェースで差し替え可能で、OpenAI Realtime(WebRTC)の `ConversationController` とオンデバイスの `LocalAgentController` が並存する。呼び出しは `:app → :via → :session → {:realtime, :audio, :tools}` の一本道で、`:diagnostics` だけは実行系列に入らず全モジュールを横断参照する起動時セルフチェック画面になっている。
 
 ![モジュール構成。app→via→sessionが縦の呼び出し系列で、sessionがrealtime/audio/toolsを合成する。](docs/images/architecture.png)
 
@@ -30,6 +34,7 @@ AAOS には、Google Assistant の代わりに自作のアプリを既定の音�
 | `:realtime` | WebRTC の PeerConnection・SDP交換・DataChannel イベント |
 | `:audio` | `JavaAudioDeviceModule` の生成、AEC/NS モード切替 |
 | `:tools` | function calling のスキーマ登録・実行パイプライン |
+| `:localagent` | 完全オンデバイスの Local Voice Agent（STT/LLM/TTS/AEC、`VoiceSessionController` の第 2 実装） |
 | `:diagnostics` | 起動時セルフチェック画面 |
 
 標準の OpenAI API キーは Android 端末に置かない。開発中はホスト PC 上で動く Session Broker のローカル代替（`backend/local_broker.py`）が保持し、Android 側は Broker が発行する短命な ephemeral credential だけを受け取る。その先の SDP 交換・ICE/DTLS 確立は OpenAI と直接行う（[docs/broker-contract.md](docs/broker-contract.md)）。
@@ -63,3 +68,6 @@ AAOS Emulator を既定の Voice Interaction App として登録し、マイク�
 - [docs/aec-device-profiles.md](docs/aec-device-profiles.md) — AEC のデバイスプロファイル
 - [docs/acceptance-checklist.md](docs/acceptance-checklist.md) — E2E 受け入れ条件チェックリスト
 - [third_party/libwebrtc/README.md](third_party/libwebrtc/README.md) — 採用している WebRTC ライブラリの方針
+- [docs/local-voice-agent-dev-plan.md](docs/local-voice-agent-dev-plan.md) — Local Voice Agent 対応の開発計画書（issue #46〜#51）
+- [docs/third-party-licenses-local-agent.md](docs/third-party-licenses-local-agent.md) — Local Voice Agent のサードパーティライセンス
+- [third_party/local_audio_engine/README.md](third_party/local_audio_engine/README.md) — オンデバイス音響エンジン（WebRTC APM）の方針

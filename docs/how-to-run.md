@@ -113,6 +113,57 @@ adb shell dumpsys package com.example.voiceinteractionappsample | grep ServerSet
 adb install -r -d app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## 5-2. Local Voice Agent(完全オンデバイス)を使う(issue #46〜#50)
+
+第 3 のモードとして、サーバーを一切使わずデバイス内だけで動く Local Voice Agent を選べる
+(STT: SenseVoice / LLM: Gemma 4 E2B / TTS: supertonic-3-ja / 音響処理: WebRTC APM)。
+OpenAI モードと違い API キーも Broker もネットワークも不要。
+
+**初回セットアップ(モデル配置、約 3GB)**:
+
+```bash
+./scripts/fetch_sherpa_onnx.sh
+```
+
+```bash
+./scripts/fetch_local_audio_engine.sh
+```
+
+```bash
+./scripts/fetch_gemma.sh && ./scripts/fetch_stt_models.sh && ./scripts/fetch_supertonic.sh
+```
+
+- 前半 2 本はビルドに必要な AAR / .so を取得する。**最初の Gradle sync 前に実行しておく**こと
+  (無いと `Null extracted folder for artifact` でビルドが落ちる)。
+- 後半 3 本はモデルを `models/` にキャッシュし、adb 接続中のデバイスへ
+  `/data/local/tmp/{llm,stt,tts}/` に push する(デバイス未接続なら再実行で push だけ行う)。
+- Gemma は 2.6GB あるので初回ダウンロードは時間がかかる。
+
+**AVD 要件(実測値)**: arm64-v8a の automotive イメージ、RAM 8GB。`/data` は config.ini の
+宣言が 16GB でも実際は 10GB 程度しか確保されないことがある(実測: 10GB 中モデル配置後の
+空き 4.9GB)。会話セッション中のアプリ実測 RSS は約 4GB。
+
+**切り替え**: 手順 5 と同じ設定画面(歯車アイコン or `am start ...ServerSettingsActivity`)で
+「Local Voice Agent (on-device)」を選んで SAVE。ホスト入力は不要(無効化される)。
+モデル未配置のまま保存すると警告 Toast が出る(保存自体は可能、後から push すればよい)。
+
+**会話**: 手順 6 と同じ(マイクアイコン)。初回 PTT はモデルロードで**数秒〜10 秒程度
+WORKING 表示のまま待つ**(2 回目以降は即座)。挨拶「こんにちは、何か御用ですか」が表示されたら
+話しかける。「猫の動画を見せて」のような依頼で YouTube 検索が開く(ツールコール、issue #50)。
+タイムアウトは OpenAI モードと同じ(無音 10 秒 / 最大 2 分)で、自動終了時は Voice Plate も
+自動で閉じる。
+
+**⚠️ 運用上のはまりどころ(実機で確認済み)**:
+
+- APK を入れ直すと既定アシスタント登録が Google Assistant に戻る(手順 4 をやり直す)。
+- `connectedAndroidTest` を実行するとテスト後にアプリがアンインストール→再インストールされ、
+  **アシスタント登録もサーバーモード設定も消える**。テスト後に手動確認する場合は
+  手順 4〜5 の再設定が必要。
+- x86_64 AVD では音響エンジン(.so)が無いため LOCAL_AGENT は ERROR 表示になる(仕様。
+  `third_party/local_audio_engine/README.md` 参照)。
+- 実マイクでの会話にはエミュレータの Extended Controls > Microphone で
+  「Enable Host Microphone Access」等の有効化が必要(手順 6 の注意と同じ)。
+
 ## 6. 会話を始める
 
 **Android Studio / エミュレータ画面から（推奨）**: エミュレータ画面右下、音量調整の右にある
@@ -190,3 +241,7 @@ build fingerprint、登録中のVoiceInteractionService、AEC対応状況、libw
   作る場合は `docs/broker-contract.md` の認証方式決定が先。
 - `onHide()` を会話の完全終了として扱う簡略実装（`CarVoiceInteractionSession` のkdoc参照）。
 - AECの合否判定自体は未確定（`docs/aec-device-profiles.md` 参照、実車評価待ち）。
+  LOCAL_AGENT モードの AEC(オンデバイス AEC3)も同じ Tests A–E の枠組みで実車評価する。
+- LOCAL_AGENT の実マイク音声での会話・barge-in はエミュレータの音響経路の制約により
+  自動テストできていない(発話注入による E2E は `LocalAgentE2eTest` で自動化済み)。
+  実機・実音声での確認は人間による評価が必要(docs/local-voice-agent-dev-plan.md §8.2)。
