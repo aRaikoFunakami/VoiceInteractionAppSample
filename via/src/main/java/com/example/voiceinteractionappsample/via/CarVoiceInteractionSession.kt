@@ -95,6 +95,19 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     }
 
     override fun onCreateContentView(): View {
+        // 実機で発見(issue #61 の権限リクエスト検証中): VoiceInteractionSession のウィンドウは
+        // 既定で画面全体(fillxfill)のサイズを取る。中身の角丸カードは WRAP_CONTENT で
+        // 左上に小さく描画されるだけだが、ウィンドウ自体の当たり判定は画面全体のまま — かつ
+        // NOT_TOUCH_MODAL は「ウィンドウの外側」へのタップだけを後ろへ通す仕組みなので、
+        // ウィンドウが画面全体である限り「外側」が存在せず、カードの外の透明な領域を含め
+        // 全タップをこのウィンドウが吸収してしまう。実行時権限ダイアログ(#61 で追加)を
+        // 表示してもタップがまったく届かず操作不能になったのはこれが原因。
+        // ウィンドウ自体を中身に合わせて WRAP_CONTENT にし、NOT_TOUCH_MODAL を実際に機能させる。
+        // VoiceInteractionSession.getWindow() は Dialog を返す。実際の Window は
+        // その Dialog.getWindow() 側にある。
+        window?.window?.setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        window?.window?.setGravity(Gravity.TOP or Gravity.START)
+
         val plate = VoicePlateView(context).also { voicePlateView = it }
         // ユーザー指摘: このウィンドウは背景が透明なまま(TYPE_VOICE_INTERACTIONの既定)で、
         // かつ中身が画面幅いっぱいに伸びていたため、後ろの画面の文字とデバッグ表示が重なって

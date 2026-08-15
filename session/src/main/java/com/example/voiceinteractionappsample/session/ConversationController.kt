@@ -114,6 +114,18 @@ class ConversationController(
         if (_state.value.connection != ConnectionState.DISCONNECTED) return // already starting/started
 
         _state.update { it.copy(connection = ConnectionState.CONNECTING) }
+
+        // issue #61: モデル読み込み等の前に権限を確認する(:audio が宣言する RECORD_AUDIO は
+        // LOCAL_AGENT と共有のパーミッション。VoiceInteractionSession は Activity ではないため
+        // MicPermissionGate 経由でトランポリン Activity からダイアログを出す)。
+        if (!MicPermissionGate.request(context)) {
+            _state.update {
+                it.copy(connection = ConnectionState.FAILED, audioInput = AudioInputState.ERROR)
+            }
+            cancel(DisconnectReason.ERROR)
+            return
+        }
+
         requestAudioFocus()
 
         // 実機で発見: AAOS Emulatorのaudioserverがセッション確立の瞬間にクラッシュ/自己再起動

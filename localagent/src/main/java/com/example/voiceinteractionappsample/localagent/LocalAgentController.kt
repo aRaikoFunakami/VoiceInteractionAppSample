@@ -16,6 +16,7 @@ import com.example.voiceinteractionappsample.session.ConnectionState
 import com.example.voiceinteractionappsample.session.ConversationSessionState
 import com.example.voiceinteractionappsample.session.ConversationState
 import com.example.voiceinteractionappsample.session.DisconnectReason
+import com.example.voiceinteractionappsample.session.MicPermissionGate
 import com.example.voiceinteractionappsample.session.SessionTimeoutPolicy
 import com.example.voiceinteractionappsample.session.VoiceSessionController
 import com.example.voiceinteractionappsample.tools.DeviceToolExecutor
@@ -116,6 +117,14 @@ class LocalAgentController(
             if (_state.value.connection != ConnectionState.DISCONNECTED) return@withLock
 
             _state.update { it.copy(connection = ConnectionState.CONNECTING) }
+
+            // issue #61: モデルロード等の前に権限を確認する。:audio が宣言する RECORD_AUDIO は
+            // OpenAI モードと共有のパーミッション(MicPermissionGate は :session に置き、
+            // ConversationController.start() でも同じゲートを通す)。
+            if (!MicPermissionGate.request(context)) {
+                fail("マイクの使用を許可してください")
+                return@withLock
+            }
 
             if (!LocalAgentRuntime.engineLoaded()) {
                 fail("音響エンジン(.so)がこの ABI にありません(arm64-v8a のみ対応)")
