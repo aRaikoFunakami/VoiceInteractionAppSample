@@ -1,0 +1,7 @@
+LIBRARY=liblocal_audio_engine.so
+SOURCE=https://github.com/aRaikoFunakami/libwebrtc (branch: local-audio, dir: local_audio/)
+RELEASE_TAG=local-audio-7300
+SHA256=e0fa76f87b4756dc7c448d2a11355e6b024a393b8e996ec9ba72bf3c03a5eb60
+WEBRTC_BRANCH=branch-heads/7300
+ANDROID_ABIS=arm64-v8a
+FETCH_SCRIPT=scripts/fetch_local_audio_engine.sh
