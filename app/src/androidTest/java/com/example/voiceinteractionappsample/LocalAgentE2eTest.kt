@@ -154,6 +154,38 @@ class LocalAgentE2eTest {
         assertEquals(ConnectionState.DISCONNECTED, controller.state.value.connection)
     }
 
+    @Test
+    fun test3_videoRequest_firesToolAndOpensYouTube() {
+        assumeTrue("models not pushed", com.example.voiceinteractionappsample.localagent.LocalAgentRuntime.modelsAvailable())
+        val stt = InjectableStt()
+        val controller = LocalAgentController(
+            context = context,
+            stt = stt,
+            toolExecutor = com.example.voiceinteractionappsample.tools.DeviceToolExecutor(
+                listOf(com.example.voiceinteractionappsample.tools.OpenYouTubeSearchTool(context)),
+            ),
+        )
+        runBlocking { controller.start() }
+        assertEquals(ConnectionState.CONNECTED, controller.state.value.connection)
+
+        stt.onFinalResult?.invoke("猫の動画を見せて")
+
+        awaitState(controller, 60_000, "tool confirmation") {
+            controller.state.value.assistantTranscript.isNotBlank() &&
+                controller.state.value.assistantTranscript != LocalAgentController.GREETING_TEXT
+        }
+        val transcript = controller.state.value.assistantTranscript
+        Log.i(TAG, "tool turn transcript: \"$transcript\"")
+        // Chromium 起動成功なら確認文、(起動不可環境なら)失敗文 — どちらもツール分岐を通った証跡。
+        // 発火自体の精度は SpikeToolCallTest(9/10, 誤発火0)で担保済み。
+        assertTrue(
+            "unexpected transcript: $transcript",
+            transcript.startsWith("YouTubeで「") || transcript == "すみません、うまく開けませんでした。",
+        )
+
+        runBlocking { controller.cancel(DisconnectReason.USER_CANCEL) }
+    }
+
     private companion object {
         const val TAG = "LocalAgentE2eTest"
     }

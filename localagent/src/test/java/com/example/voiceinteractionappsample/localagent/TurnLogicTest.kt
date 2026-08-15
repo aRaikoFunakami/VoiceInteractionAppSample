@@ -60,3 +60,36 @@ class TurnLogicTest {
         assertEquals(2, fired) // 8 tick で 2 回成立(4 連続 × 2)
     }
 }
+
+class LocalToolBridgeTest {
+    @Test
+    fun leakedToolCall_isRecovered() {
+        // スパイク実測で観測した LiteRT-LM 0.16.0 のパース漏れ形式そのまま
+        val call = LocalToolBridge.parseLeakedToolCall("""open_youtube_search{query:<|"|>猫の動画<|"|>}""")
+        org.junit.Assert.assertNotNull(call)
+        org.junit.Assert.assertEquals("open_youtube_search", call!!.name)
+        org.junit.Assert.assertEquals("猫の動画", org.json.JSONObject(call.argumentsJson).getString("query"))
+    }
+
+    @Test
+    fun plainReply_isNotMistakenForToolCall() {
+        org.junit.Assert.assertNull(LocalToolBridge.parseLeakedToolCall("はい、猫の動画をいくつか見せてあげましょうか？"))
+        org.junit.Assert.assertNull(LocalToolBridge.parseLeakedToolCall(""))
+    }
+
+    @Test
+    fun confirmationText_successAndFailure() {
+        org.junit.Assert.assertEquals(
+            "YouTubeで「猫の動画」を検索します",
+            toolConfirmationText("""{"query":"猫の動画"}""", "SUCCESS", "OPENED"),
+        )
+        org.junit.Assert.assertEquals(
+            "すみません、うまく開けませんでした。",
+            toolConfirmationText("""{"query":"猫"}""", "SUCCESS", "NO_HANDLER"),
+        )
+        org.junit.Assert.assertEquals(
+            "すみません、うまく開けませんでした。",
+            toolConfirmationText("not json", "FAILED", ""),
+        )
+    }
+}

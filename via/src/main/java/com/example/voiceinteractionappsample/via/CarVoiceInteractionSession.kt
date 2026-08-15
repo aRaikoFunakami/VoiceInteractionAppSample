@@ -68,9 +68,10 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     private fun createController(): VoiceSessionController {
         val serverSettings = RealtimeServerSettings(context)
         if (serverSettings.mode == RealtimeServerMode.LOCAL_AGENT) {
-            // issue #48: 完全オンデバイスの local voice agent。ツールは #50 で接続する。
+            // issue #48/#50: 完全オンデバイスの local voice agent + YouTube 検索ツール。
             return LocalAgentController(
                 context = context,
+                toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
                 onAutoTerminated = { reason ->
                     Log.i(TAG, "local agent auto-terminated: $reason — hiding Voice Plate")
                     scope.launch { hide() }
@@ -176,6 +177,8 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
             state.connection == ConnectionState.CONNECTING -> VoicePlateState.WORKING
             state.audioOutput == AudioOutputState.PLAYING -> VoicePlateState.SPEAKING
             state.conversation == ConversationState.MODEL_PROCESSING -> VoicePlateState.THINKING
+            // issue #50: ローカルツール実行中(YouTube 起動など)。LOCAL_AGENT のみ発生する。
+            state.conversation == ConversationState.TOOL_EXECUTING -> VoicePlateState.WORKING
             else -> VoicePlateState.LISTENING
         }
         voicePlateView?.render(plateState, state)
