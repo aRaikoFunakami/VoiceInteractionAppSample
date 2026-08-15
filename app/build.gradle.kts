@@ -52,5 +52,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.litertlm.android) // SpikeToolCallTest (issue #50)
     androidTestImplementation(libs.kotlinx.coroutines.android)
 }

@@ -52,7 +52,7 @@ class LocalAgentControllerTest {
     private fun controller(
         stt: FakeStt = FakeStt(),
         ttsPlayer: TtsPlayer = TtsPlayer(FakeSynth()),
-        ask: suspend (String) -> String = { "はい、わかりました。" },
+        ask: suspend (String) -> LocalToolBridge.LlmTurn = { LocalToolBridge.LlmTurn(null, "はい、わかりました。") },
     ) = LocalAgentController(
         context = InstrumentationRegistry.getInstrumentation().targetContext,
         stt = stt,
@@ -62,7 +62,7 @@ class LocalAgentControllerTest {
 
     @Test
     fun utterance_runsFullTurn_updatingTranscriptsAndAudioState() = runBlocking {
-        val c = controller(ask = { text -> "echo:$text" })
+        val c = controller(ask = { text -> LocalToolBridge.LlmTurn(null, "echo:$text") })
         c.seedForTest(connectedState())
 
         c.onUtterance("今日の天気は？")

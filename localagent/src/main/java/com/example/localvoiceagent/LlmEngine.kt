@@ -1,11 +1,14 @@
 package com.example.localvoiceagent
 
+import com.example.voiceinteractionappsample.localagent.LocalToolBridge
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.tool
 import java.io.File
 
 /**
@@ -42,18 +45,32 @@ class LlmEngine {
         val e = Engine(EngineConfig(modelPath = MODEL_PATH, backend = Backend.CPU()))
         e.initialize()
         engine = e
-        conversation = e.createConversation(
-            ConversationConfig(systemInstruction = Contents.of(SYSTEM_INSTRUCTION)),
-        )
+        conversation = newConversation(e)
     }
+
+    // issue #50: YouTube 検索ツールを宣言付きで会話に組み込む。実行は自動ではなく
+    // DeviceToolExecutor 経由(automaticToolCalling = false)。
+    private fun newConversation(e: Engine): Conversation = e.createConversation(
+        ConversationConfig(
+            systemInstruction = Contents.of(
+                SYSTEM_INSTRUCTION + LocalToolBridge.TOOL_INSTRUCTION,
+            ),
+            tools = listOf(tool(LocalToolBridge.YouTubeToolSet())),
+            automaticToolCalling = false,
+        ),
+    )
 
     fun isInitialized(): Boolean = engine != null
 
     /** 同期テキスト対話。応答テキストを返す。cancelActive() で中断されると例外で抜ける。 */
     @Synchronized
-    fun ask(prompt: String): String {
+    fun ask(prompt: String): String = askMessage(prompt).toString()
+
+    /** 同期対話(ツールコール判定用に Message のまま返す)。issue #50。 */
+    @Synchronized
+    fun askMessage(prompt: String): Message {
         val c = conversation ?: error("not initialized")
-        return c.sendMessage(prompt).toString()
+        return c.sendMessage(prompt)
     }
 
     /**
@@ -69,9 +86,7 @@ class LlmEngine {
     fun resetConversation() {
         val e = engine ?: return
         runCatching { conversation?.close() }
-        conversation = e.createConversation(
-            ConversationConfig(systemInstruction = Contents.of(SYSTEM_INSTRUCTION)),
-        )
+        conversation = newConversation(e)
     }
 
     @Synchronized

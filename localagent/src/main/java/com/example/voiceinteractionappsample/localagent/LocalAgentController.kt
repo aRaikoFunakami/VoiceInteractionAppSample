@@ -58,10 +58,9 @@ class LocalAgentController(
     private val context: Context,
     private val stt: SpeechRecognizer = LocalAgentRuntime.stt,
     private val ttsPlayer: TtsPlayer = LocalAgentRuntime.ttsPlayer,
-    private val ask: suspend (String) -> String = { prompt ->
-        LocalAgentRuntime.llm.ask(prompt)
+    private val ask: suspend (String) -> LocalToolBridge.LlmTurn = { prompt ->
+        LocalToolBridge.toTurn(LocalAgentRuntime.llm.askMessage(prompt))
     },
-    @Suppress("unused") // issue #50 (ツールコール) で使用する
     private val toolExecutor: DeviceToolExecutor = DeviceToolExecutor(emptyList()),
     private val sessionTimeoutPolicy: SessionTimeoutPolicy = SessionTimeoutPolicy(),
     private val onAutoTerminated: (DisconnectReason) -> Unit = {},
@@ -234,13 +233,25 @@ class LocalAgentController(
                 audioOutput = AudioOutputState.IDLE,
             )
         }
-        val reply = runCatching { ask(text) }.getOrElse { e ->
+        val turn = runCatching { ask(text) }.getOrElse { e ->
             Log.w(TAG, "llm ask failed", e)
-            FALLBACK_TEXT
+            LocalToolBridge.LlmTurn(toolCall = null, replyText = FALLBACK_TEXT)
         }
         if (myGen != generation.get()) {
             Log.i(TAG, "late reply discarded") // 推論中に cancel() された(打ち切り or 破棄)
             return
+        }
+        val reply = if (turn.toolCall != null) {
+            // issue #50: モデルのツールコールは必ず DeviceToolExecutor のパイプラインを通す。
+            // 結果の読み上げは固定文(2 回目の LLM 往復を省き、パース漏れ救済経路とも整合)。
+            Log.i(TAG, "tool call: ${turn.toolCall.name}(${turn.toolCall.argumentsJson})")
+            _state.update { it.copy(conversation = ConversationState.TOOL_EXECUTING) }
+            val result = toolExecutor.execute(turn.toolCall)
+            if (myGen != generation.get()) return
+            Log.i(TAG, "tool result: ${result.outcome} ${result.output}")
+            toolConfirmationText(turn.toolCall.argumentsJson, result.outcome.name, result.output.optString("result"))
+        } else {
+            turn.replyText
         }
         touchActivity()
         _state.update {

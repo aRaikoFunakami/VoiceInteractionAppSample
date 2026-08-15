@@ -31,6 +31,7 @@ dependencies {
     // コンパイルのみここで参照し、ランタイム同梱は :app 側の implementation(files(...)) が担う。
     compileOnly(files("libs/sherpa-onnx-1.13.5.aar"))
     testImplementation(libs.junit)
+    testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
