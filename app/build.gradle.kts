@@ -53,5 +53,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.litertlm.android) // SpikeToolCallTest (issue #50)
+    androidTestImplementation(libs.androidx.uiautomator) // 実画面 Voice Plate 検証 (issue #59)
     androidTestImplementation(libs.kotlinx.coroutines.android)
 }
