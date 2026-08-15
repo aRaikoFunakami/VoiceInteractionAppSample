@@ -16,3 +16,10 @@ build/
 .externalNativeBuild
 .cxx
 local.properties
+
+# local voice agent (issue #46〜): モデル・バイナリはコミットしない
+models/
+localagent/libs/*.aar
+localagent/src/main/jniLibs/
+*.onnx
+*.litertlm
