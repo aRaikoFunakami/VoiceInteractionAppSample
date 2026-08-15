@@ -28,6 +28,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/server_settings_mode_local" />
+
+        <RadioButton
+            android:id="@+id/mode_local_agent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/server_settings_mode_local_agent" />
     </RadioGroup>
 
     <EditText

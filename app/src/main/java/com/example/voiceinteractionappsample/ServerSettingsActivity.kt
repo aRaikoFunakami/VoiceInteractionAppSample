@@ -24,14 +24,25 @@ class ServerSettingsActivity : AppCompatActivity() {
         val modeGroup = findViewById<RadioGroup>(R.id.mode_group)
         val localHost = findViewById<EditText>(R.id.local_host)
 
-        modeGroup.check(if (settings.mode == RealtimeServerMode.LOCAL) R.id.mode_local else R.id.mode_openai)
+        modeGroup.check(
+            when (settings.mode) {
+                RealtimeServerMode.LOCAL -> R.id.mode_local
+                RealtimeServerMode.LOCAL_AGENT -> R.id.mode_local_agent
+                RealtimeServerMode.OPENAI -> R.id.mode_openai
+            },
+        )
         localHost.setText(settings.localHost)
+        // LOCAL_AGENT はオンデバイス動作でホスト設定を使わない (#47)
+        modeGroup.setOnCheckedChangeListener { _, checkedId ->
+            localHost.isEnabled = checkedId != R.id.mode_local_agent
+        }
+        localHost.isEnabled = modeGroup.checkedRadioButtonId != R.id.mode_local_agent
 
         findViewById<android.widget.Button>(R.id.save_button).setOnClickListener {
-            settings.mode = if (modeGroup.checkedRadioButtonId == R.id.mode_local) {
-                RealtimeServerMode.LOCAL
-            } else {
-                RealtimeServerMode.OPENAI
+            settings.mode = when (modeGroup.checkedRadioButtonId) {
+                R.id.mode_local -> RealtimeServerMode.LOCAL
+                R.id.mode_local_agent -> RealtimeServerMode.LOCAL_AGENT
+                else -> RealtimeServerMode.OPENAI
             }
             // issue #43: RealtimeServerSettings interpolates this straight into "http://$host:port/...".
             // Users are likely to paste a full URL they saw in a server's own startup log (e.g.

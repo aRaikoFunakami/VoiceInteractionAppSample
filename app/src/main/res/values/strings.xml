@@ -3,6 +3,7 @@
     <string name="server_settings_title">Realtime Server</string>
     <string name="server_settings_mode_openai">OpenAI Realtime</string>
     <string name="server_settings_mode_local">Local (local_realtime_llm)</string>
+    <string name="server_settings_mode_local_agent">Local Voice Agent (on-device)</string>
     <string name="server_settings_local_host_hint">Local server host, e.g. 10.0.2.2</string>
     <string name="server_settings_save">Save</string>
     <string name="server_settings_saved">Saved</string>
