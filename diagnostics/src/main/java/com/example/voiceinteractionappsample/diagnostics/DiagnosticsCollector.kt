@@ -8,6 +8,8 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import com.example.voiceinteractionappsample.audio.AecMode
+import com.example.voiceinteractionappsample.realtime.RealtimeServerMode
+import com.example.voiceinteractionappsample.realtime.RealtimeServerSettings
 import com.example.voiceinteractionappsample.session.ConversationController
 import java.net.HttpURLConnection
 import java.net.URL
@@ -42,7 +44,13 @@ object DiagnosticsCollector {
             // third_party/libwebrtc/VERSION の固定値と一致させる — ズレたらそちらも直す。
             libwebrtcLibrary = "io.getstream:stream-webrtc-android:1.3.10",
             supportedAbis = Build.SUPPORTED_ABIS.toList(),
-            backendReachable = withContext(Dispatchers.IO) { checkBackendReachable() },
+            // issue #49: 到達性チェックは OPENAI モードの時だけ意味を持つ(従来は LOCAL モードでも
+            // api.openai.com を見ていた既知バグ)。LOCAL/LOCAL_AGENT では null(= n/a)。
+            backendReachable = if (RealtimeServerSettings(context).mode == RealtimeServerMode.OPENAI) {
+                withContext(Dispatchers.IO) { checkBackendReachable() }
+            } else {
+                null
+            },
             connectionState = connectionState?.connection?.name ?: "NOT_CONNECTED",
             iceState = null, // PeerConnection.iceConnectionState() は :realtime内部にありここへ未配線 — Phase 7以降で必要になれば追加する
             selectedCandidatePair = null, // getStats()連携は20節のWebRTC統計取得と合わせて別途配線する
