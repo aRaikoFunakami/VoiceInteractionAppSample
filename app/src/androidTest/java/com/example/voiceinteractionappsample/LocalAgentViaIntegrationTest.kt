@@ -70,6 +70,19 @@ class LocalAgentViaIntegrationTest {
 
         RealtimeServerSettings(context).mode = RealtimeServerMode.LOCAL_AGENT
 
+        // issue #61 で判明: Android 15 の audio focus hardening は TOP でないプロセスの
+        // focus 要求を procState 次第で DENY する(#48 の PR で最初に発見した現象と同一 —
+        // AS.HardeningEnforcer: Focus request DENIED ... procState:4)。実運用ではユーザーが
+        // マイクアイコンを押した瞬間にプロセスは前面にいるため通常は問題にならないが、
+        // インストゥルメンテーションテストの直後(install -r 直後など)はプロセスの重要度が
+        // まだ TOP に昇格していないことがあり再現しうる。LocalAgentE2eTest と同じ対策
+        // (自アプリの Activity を起動して TOP を作る)をここでも行う。
+        context.startActivity(
+            android.content.Intent(context, ServerSettingsActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        Thread.sleep(1500)
+
         val component = "$PACKAGE/$PACKAGE.via.VoiceInteractionServiceImpl"
         shell("settings put --user $userId secure voice_interaction_service $component")
         shell("settings put --user $userId secure assistant $component")
@@ -110,6 +123,12 @@ class LocalAgentViaIntegrationTest {
         shell("cmd voiceinteraction show")
         val hidden = device.wait(Until.gone(By.textContains("接続:")), 5_000)
         assertTrueWithScreen("Voice Plate did not disappear after toggle-to-stop", hidden)
+        // 実機で発見: Voice Plate が画面から消えるのは onHide() 呼び出し直後だが、
+        // cancel() の後片付け(_state を DISCONNECTED へリセット)は非同期に完了する。
+        // 消えた直後に即座に 3 回目を押すと、toggle-to-stop ガードがまだ CONNECTED/CONNECTING
+        // を見て再度「アクティブ」と判定してしまうことがある(cancel() 未完了によるテスト側の
+        // レース。実際の人間の指の速さでは起きない間隔だが、テストは機械的に速すぎる)。
+        Thread.sleep(500)
 
         // 4. 再度 PTT。#47 で直した「失敗後/終了後の PTT が新規セッションとして再試行できる」を
         //    LocalAgentController の内部 API 経由ではなく、実際に VIA からもう一度起動して検証する。
