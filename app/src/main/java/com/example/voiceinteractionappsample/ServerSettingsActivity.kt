@@ -53,7 +53,16 @@ class ServerSettingsActivity : AppCompatActivity() {
             if (sanitizedHost.isNotEmpty()) {
                 settings.localHost = sanitizedHost
             }
-            Toast.makeText(this, R.string.server_settings_saved, Toast.LENGTH_SHORT).show()
+            // issue #48: モデル未配置のまま LOCAL_AGENT を選んでも保存は許可する(後から push できる)
+            // が、気づけるように警告する。modelsAvailable() はファイル存在チェックのみで軽い。
+            val message = if (settings.mode == RealtimeServerMode.LOCAL_AGENT &&
+                !com.example.voiceinteractionappsample.localagent.LocalAgentRuntime.modelsAvailable()
+            ) {
+                R.string.server_settings_saved_models_missing
+            } else {
+                R.string.server_settings_saved
+            }
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
     }
 

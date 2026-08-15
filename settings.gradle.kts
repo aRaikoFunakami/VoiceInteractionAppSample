@@ -30,4 +30,5 @@ include(":audio")
 include(":tools")
 include(":session")
 include(":diagnostics")
+include(":localagent")
  

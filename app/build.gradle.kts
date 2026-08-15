@@ -41,10 +41,16 @@ dependencies {
     implementation(project(":via"))
     implementation(project(":diagnostics"))
     implementation(project(":realtime")) // ServerSettingsActivity (issue #43)
+    implementation(project(":localagent")) // モデル配置チェック (issue #48)
+    // sherpa-onnx AAR のランタイム同梱。:localagent は AGP 制約(AAR-in-library 禁止)により
+    // compileOnly のため、実行時クラスはここで供給する (docs/local-voice-agent-dev-plan.md §2.4-1)
+    implementation(files("../localagent/libs/sherpa-onnx-1.13.5.aar"))
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.kotlinx.coroutines.android)
 }

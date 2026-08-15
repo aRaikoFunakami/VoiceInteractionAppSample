@@ -20,5 +20,6 @@ android {
 
 dependencies {
     api(project(":session"))
+    implementation(project(":localagent")) // LocalAgentController (issue #48)
     implementation(libs.kotlinx.coroutines.android)
 }
