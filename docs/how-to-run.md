@@ -32,7 +32,13 @@ Android Studioの **Run** ボタンでも同じことができる。ただしRun
 ——それは通常のActivityではなく `VoiceInteractionService` なので、Run/デバッグの対象には
 ならない。起動方法はステップ6を参照。
 
-## 3. マイク権限を付与する（AAOSは複数ユーザー — 全ユーザーに付与する）
+## 3. マイク権限（issue #63 以降は事前付与不要）
+
+issue #63 以降、マイク未許可のまま PTT を押すと OS の権限ダイアログが自動的に出る
+(`MicPermissionGate` がトランポリン Activity 経由で要求する)。ダイアログで
+「While using the app」を選べばそのまま会話が始まる。**通常はこの節の手順は不要。**
+
+adb で明示的に付与/剥奪してテストしたい場合のみ:
 
 ```bash
 adb shell pm list users
@@ -43,7 +49,10 @@ adb shell am force-stop com.example.voiceinteractionappsample
 ```
 
 （`am force-stop` が必要な理由: 既に起動済みのプロセスは権限を後から付与しても即座には
-反映されないことがある — 実機検証で見つかった挙動。）
+反映されないことがある — 実機検証で見つかった挙動。逆に **起動中のプロセス自身の権限を
+`pm revoke` すると、その場でプロセスが強制終了される**（Android の仕様）。テストコードから
+自分自身を revoke してはいけない — `app/src/androidTest/.../MicPermissionRequestTest.kt`
+のコメント参照。）
 
 ## 4. 既定のVoice Interaction Appとして登録する
 

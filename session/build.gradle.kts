@@ -24,6 +24,7 @@ dependencies {
     api(project(":audio"))
     api(project(":tools"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.core.ktx) // MicPermissionGate: ContextCompat.checkSelfPermission
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)

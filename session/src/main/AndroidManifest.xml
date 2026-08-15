@@ -1,2 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- MicPermissionGate 専用の不可視トランポリン (issue #61)。常に自アプリ内の
+             Intent 経由でのみ起動するため exported="false"。 -->
+        <activity
+            android:name=".MicPermissionTrampolineActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+</manifest>
