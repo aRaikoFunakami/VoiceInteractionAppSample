@@ -18,8 +18,9 @@ AAOS には、Google Assistant の代わりに自作のアプリを既定の音�
   [docs/how-to-run.md](docs/how-to-run.md) の「接続先サーバーを切り替える」を参照）
 - **完全オンデバイスの Local Voice Agent モード**（サーバー・APIキー・ネットワーク不要）。
   SenseVoice STT + Gemma 4 E2B (LiteRT-LM) + supertonic-3-ja TTS + WebRTC APM(AEC3) を
-  デバイス内で動かし、barge-in と YouTube 検索ツールコールまで同じ Voice Plate 上で動作する
-  （セットアップは [docs/how-to-run.md](docs/how-to-run.md) の「Local Voice Agent」を参照）
+  デバイス内で動かし、barge-in と YouTube 検索ツールコールまで同じ Voice Plate 上で動作する。
+  **使う前に `scripts/` 以下のスクリプトでモデル・バイナリ（計約3GB）を取得し、
+  端末へ push しておく必要がある**（APK には同梱しない。手順は下記「動かし方」参照）
 
 ## アーキテクチャ
 
@@ -52,7 +53,17 @@ python3 backend/local_broker.py
 ./gradlew :app:installDebug
 ```
 
-AAOS Emulator を既定の Voice Interaction App として登録し、マイクアイコンから会話を始める手順は [docs/how-to-run.md](docs/how-to-run.md) に手順化してある（マルチユーザーへの権限付与・既定アシスタント登録・Chrome インストールなど、AAOS 特有のはまりどころを含む）。
+Local Voice Agent モード（完全オンデバイス）を使う場合は、上記に加えて **`scripts/` 以下のスクリプトでモデル・バイナリを取得し、接続中の端末へ push しておく**必要がある（初回のみ、計約3GB。APK には同梱しないため、これをやらないとマイク初期化以降で失敗する）。`localagent/libs/` と `localagent/src/main/jniLibs/` 向けの2本は最初の Gradle sync 前に実行しておくこと:
+
+```bash
+./scripts/fetch_sherpa_onnx.sh        # sherpa-onnx AAR（ビルドに必要）
+./scripts/fetch_local_audio_engine.sh # 音響処理エンジン .so（ビルドに必要）
+./scripts/fetch_gemma.sh              # LLM モデル（adb 接続中の端末へ自動 push）
+./scripts/fetch_stt_models.sh         # STT + VAD モデル（同上）
+./scripts/fetch_supertonic.sh         # TTS モデル（同上）
+```
+
+AAOS Emulator を既定の Voice Interaction App として登録し、マイクアイコンから会話を始める手順は [docs/how-to-run.md](docs/how-to-run.md) に手順化してある（マルチユーザーへの権限付与・既定アシスタント登録・Chrome インストール・Local Voice Agent のセットアップなど、AAOS 特有のはまりどころを含む）。
 
 ## 既知の制約
 
