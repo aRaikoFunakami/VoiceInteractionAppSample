@@ -222,13 +222,19 @@ class LocalAgentController(
             Log.d(TAG, "fragment ignored: $text")
             return
         }
+        // パイプライン診断用(ユーザー報告「マイクは動いているのにAIが反応しない」):
+        // ここが出ない = マイク/STTまでは来ているが有効な発話として認識されていない。
+        Log.i(TAG, "stt final: \"$text\"")
         scope.launch { onUtterance(text) }
     }
 
     /** 1 会話ターン。internal はテスト用(JVM/androidTest から直接駆動する)。 */
     internal suspend fun onUtterance(text: String) {
         val s = _state.value
-        if (s.connection != ConnectionState.CONNECTED) return
+        if (s.connection != ConnectionState.CONNECTED) {
+            Log.d(TAG, "utterance dropped: not connected (state=${s.connection})")
+            return
+        }
         if (s.conversation == ConversationState.MODEL_PROCESSING) {
             Log.d(TAG, "utterance during THINKING ignored: $text") // v1 の割り切り(現ターン優先)
             return
@@ -242,6 +248,9 @@ class LocalAgentController(
                 audioOutput = AudioOutputState.IDLE,
             )
         }
+        // ここが出て次の "llm reply" が出ない = ask()(LLM推論)がハングしているか、
+        // cancelActive()が効かず打ち切れていない疑い。
+        Log.i(TAG, "llm ask: \"$text\"")
         val turn = runCatching { ask(text) }.getOrElse { e ->
             Log.w(TAG, "llm ask failed", e)
             LocalToolBridge.LlmTurn(toolCall = null, replyText = FALLBACK_TEXT)
@@ -250,6 +259,7 @@ class LocalAgentController(
             Log.i(TAG, "late reply discarded") // 推論中に cancel() された(打ち切り or 破棄)
             return
         }
+        Log.i(TAG, "llm reply: toolCall=${turn.toolCall?.name} replyText=\"${turn.replyText}\"")
         val reply = if (turn.toolCall != null) {
             // issue #50: モデルのツールコールは必ず DeviceToolExecutor のパイプラインを通す。
             // 結果の読み上げは固定文(2 回目の LLM 往復を省き、パース漏れ救済経路とも整合)。
@@ -270,6 +280,9 @@ class LocalAgentController(
                 audioOutput = AudioOutputState.PLAYING,
             )
         }
+        // ここが出て TtsPlayer側の "speak done" が出ない = 合成がハングしているか、
+        // 例外が起きている(TtsPlayer.speak()のログを見る)。
+        Log.i(TAG, "tts speak: \"$reply\"")
         ttsPlayer.speak(reply)
     }
 

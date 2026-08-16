@@ -1,5 +1,6 @@
 package com.example.localvoiceagent.tts
 
+import android.util.Log
 import com.example.localvoiceagent.LocalAudioEngine
 import java.nio.ByteBuffer
 import java.util.concurrent.ArrayBlockingQueue
@@ -41,6 +42,7 @@ class TtsPlayer(private val tts: SpeechSynthesizer) {
     fun speak(text: String, onDone: (() -> Unit)? = null) {
         cancelled = false
         speaking.set(true)
+        Log.i(TAG, "speak: \"$text\"")
         worker.execute {
             try {
                 tts.synthesize(text, object : AudioSink {
@@ -49,6 +51,12 @@ class TtsPlayer(private val tts: SpeechSynthesizer) {
                     }
                     override fun onEnd() {}
                 })
+                Log.i(TAG, "speak done")
+            } catch (t: Throwable) {
+                // パイプライン診断: 元々ここに catch が無く、合成失敗(モデル異常/OOM等)が
+                // ログ無しで完全に握りつぶされていた ―「LLMは返事したのにTTSが鳴らない」の
+                // 原因になり得る。診断できるようログに残す。
+                Log.e(TAG, "speak failed: \"$text\"", t)
             } finally {
                 speaking.set(false)
                 onDone?.invoke()
@@ -92,5 +100,9 @@ class TtsPlayer(private val tts: SpeechSynthesizer) {
             out[i] = ((pcm[a] * (1 - f)) + (pcm[b] * f)).toInt().toShort()
         }
         return out
+    }
+
+    private companion object {
+        const val TAG = "TtsPlayer"
     }
 }

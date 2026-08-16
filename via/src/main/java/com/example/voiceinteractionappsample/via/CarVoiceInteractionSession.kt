@@ -64,6 +64,18 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
     // issue #47: onShow()ごとに launchIn していた state コレクタが解放されず PTT のたびに
     // 増えていた(旧コレクタは破棄済み controller を監視し続ける)。Job を保持して張り替える。
     private var stateJob: Job? = null
+    // 実機で発見: onShow()のトグル判定を controller.state.value.connection(非同期の後片付けが
+    // 終わるまで古い値のまま)で行っていたため、強制終了直後にマイクを押すと毎回「まだアクティブ」
+    // と誤判定し、新しい会話が二度と始まらなかった。ここは我々自身が同期的に更新するフラグにし、
+    // cancel()の後片付け(スレッドjoinで最大数秒)の完了タイミングと切り離す。
+    private var sessionActive = false
+    // onHide()は「フレームワークが我々の関与なくhideした(バックグラウンド遷移等)」場合にのみ
+    // controllerをcancel()すればよい。自分からhide()を呼ぶ経路(トグル停止・auto-terminate)は
+    // 対象のcontrollerを呼び出し側で明示的に処理済み(auto-terminateはcancel()の後にしか
+    // 呼ばれない)なので、onHide()側で可変フィールドcontrollerを読み直すと、そのhide()が届く前に
+    // 次のonShow()が新しい(無関係な)controllerに差し替えていた場合、今動いている新セッションを
+    // 誤ってcancelしてしまう。このフラグで「onHide()は何もしなくていい」ケースを区別する。
+    private var selfInitiatedHide = false
 
     private fun createController(): VoiceSessionController {
         val serverSettings = RealtimeServerSettings(context)
@@ -74,7 +86,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
                 toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
                 onAutoTerminated = { reason ->
                     Log.i(TAG, "local agent auto-terminated: $reason — hiding Voice Plate")
-                    scope.launch { hide() }
+                    scope.launch { sessionActive = false; selfInitiatedHide = true; hide() }
                 },
             )
         }
@@ -89,7 +101,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
                 // ため画面だけが古い状態のまま残っていた。self-terminate側からもhide()を呼ぶ。
                 // onAutoTerminatedはバックグラウンドディスパッチャから呼ばれるのでMainへ渡す。
                 Log.i(TAG, "auto-terminated: $reason — hiding Voice Plate")
-                scope.launch { hide() }
+                scope.launch { sessionActive = false; selfInitiatedHide = true; hide() }
             },
         )
     }
@@ -142,19 +154,26 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
         // onShow()自体はちゃんと再度呼ばれている（フレームワークが自動でhide()に
         // 振り替えてはくれない）。つまりトグル判定はアプリ側の責務 — 既に会話が
         // アクティブな状態でonShow()が来たら「終了しろ」という意図として扱う。
-        // issue #47: FAILED は「アクティブ」扱いにしない。FAILED のまま latch すると次の PTT が
-        // 「停止」として消費され、再試行に 2 回の押下が必要になる(start() が例外で抜けた場合の
-        // 既存 OpenAI パスにも同じ問題があった)。FAILED なら新しい controller で再試行する。
-        if (controller.state.value.connection !in
-            setOf(ConnectionState.DISCONNECTED, ConnectionState.FAILED)
-        ) {
+        // sessionActive(同期フラグ)で判定する。controller.state.value.connection を見ていた
+        // 旧実装は、cancel()の非同期な後片付け(スレッドjoinで最大数秒)が終わるまで古い値の
+        // ままだったため、後片付け完了前にマイクを押すと毎回「まだアクティブ」と誤判定し、
+        // 新しい会話が二度と始まらなかった(「一度強制終了すると会話できなくなる」の原因)。
+        if (sessionActive) {
             Log.i(TAG, "onShow() while already active — treating as toggle-to-stop")
+            // controllerを直接cancel()するのではなくローカル変数に取ってから呼ぶ — hide()から
+            // onHide()が実際に届くまでの間に次のonShow()がcontrollerフィールドを新しい
+            // (無関係な)controllerへ差し替えても、このcancel()の対象が影響を受けないようにする。
+            val old = controller
+            sessionActive = false
+            selfInitiatedHide = true
+            scope.launch { old.cancel() }
             hide()
             return
         }
 
         // issue #43: fresh RealtimeServerSettings read for every PTT press (see createController()).
         controller = createController()
+        sessionActive = true
         stateJob?.cancel()
         stateJob = controller.state.onEach { updateVoicePlate(it) }.launchIn(scope)
         scope.launch {
@@ -165,6 +184,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
                 voicePlateView?.render(VoicePlateState.ERROR, ConversationSessionState())
                 // issue #47: 例外で抜けると state が CONNECTING のまま残り、次の PTT が
                 // toggle-to-stop に化けて再試行に 2 回かかる。cancel() で DISCONNECTED に戻す。
+                sessionActive = false
                 runCatching { controller.cancel(DisconnectReason.ERROR) }
             }
         }
@@ -176,7 +196,18 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
         // （26節）。このサンプルでは簡略化して「hideされたら会話も終える」とする —
         // ponytail: この単純化には天井がある。hide理由（バックグラウンド遷移 vs ユーザーに
         // よる明示的終了）を区別する必要が出たら見直す。
-        scope.launch { controller.cancel() }
+        // code review で指摘: 自分からhide()を呼んだ経路(トグル停止・auto-terminate)は
+        // 対象のcontrollerを呼び出し元で既に処理済み。ここで可変フィールドcontrollerを
+        // 読み直すと、そのhide()がonHide()として届く前に次のonShow()が新しい(無関係な)
+        // controllerに差し替えていた場合、今動いている新セッションを誤ってcancelしてしまう
+        // (LOCAL_AGENTでは共有シングルトンのTTS/LLM推論まで巻き込んで中断されうる)。
+        // selfInitiatedHideで「フレームワーク起因の本物のhide」だけに絞る。
+        if (selfInitiatedHide) {
+            selfInitiatedHide = false
+        } else {
+            sessionActive = false
+            scope.launch { controller.cancel() }
+        }
         super.onHide()
     }
 
