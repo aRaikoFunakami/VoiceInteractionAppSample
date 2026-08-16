@@ -63,7 +63,7 @@ Local Voice Agent モード（完全オンデバイス）を使う場合は、�
 ./scripts/fetch_supertonic.sh         # TTS モデル（同上）
 ```
 
-AAOS Emulator を既定の Voice Interaction App として登録し、マイクアイコンから会話を始める手順は [docs/how-to-run.md](docs/how-to-run.md) に手順化してある（マルチユーザーへの権限付与・既定アシスタント登録・Chrome インストール・Local Voice Agent のセットアップなど、AAOS 特有のはまりどころを含む）。
+AAOS Emulator を既定の Voice Interaction App として登録し、マイクアイコンから会話を始める手順は [docs/how-to-run.md](docs/how-to-run.md) に手順化してある（マルチユーザーへの権限付与・既定アシスタント登録・Chrome インストール・Local Voice Agent のセットアップなど、AAOS 特有のはまりどころを含む）。AAOS イメージには標準でブラウザが無いため、動作確認用の Chrome（`ChromePublic.apk`, arm64）は [Chromium 公式ビルドスナップショット](https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Android_Arm64) から入手できる。
 
 ## 既知の制約
 

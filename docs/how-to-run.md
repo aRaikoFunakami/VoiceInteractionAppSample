@@ -208,6 +208,9 @@ Viewer（QRコード表示、スマホ側に引き渡す仕組み）に着地す
 された動作だが、実際にアプリ内でページを開く様子を確認したい場合は次の手順でChromeを
 入れる：
 
+`ChromePublic.apk`（arm64）は [Chromium公式のビルドスナップショット一覧](https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Android_Arm64)
+から取得できる。任意のビルド番号のディレクトリを開き、`ChromePublic.apk`をダウンロードする。
+
 ```bash
 adb install /path/to/ChromePublic.apk
 adb shell pm enable --user 0  org.chromium.chrome
