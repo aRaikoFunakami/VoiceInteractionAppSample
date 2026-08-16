@@ -135,7 +135,14 @@ class SenseVoiceRecognizer : SpeechRecognizer {
                         recognizer.decode(stream)
                         val text = recognizer.getResult(stream).text.trim()
                         stream.release()
-                        if (text.isNotEmpty()) results.add(text)
+                        if (text.isNotEmpty()) {
+                            results.add(text)
+                        } else {
+                            // パイプライン診断: VADは発話区間を検出したがSenseVoiceが空文字を
+                            // 返した(無音・雑音のみのセグメント等)。ここが頻発する = マイクの
+                            // 音量/AEC設定を疑う("マイクは動いているのにAIが反応しない"の一因)。
+                            Log.d(TAG, "vad segment decoded to empty text (discarded)")
+                        }
                     }
                 }
                 // コールバックはロック外で呼ぶ(受け手が reset() を呼んでもデッドロックしない)
