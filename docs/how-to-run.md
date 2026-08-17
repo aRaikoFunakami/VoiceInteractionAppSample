@@ -153,7 +153,7 @@ OpenAI モードと違い API キーも Broker もネットワークも不要。
 空き 4.9GB)。会話セッション中のアプリ実測 RSS は約 4GB。
 
 **切り替え**: 手順 5 と同じ設定画面(歯車アイコン or `am start ...ServerSettingsActivity`)で
-「Local Voice Agent (on-device)」を選んで SAVE。ホスト入力は不要(無効化される)。
+「On-device Local Voice Agent (no server)」を選んで SAVE。ホスト入力は不要(無効化される)。
 モデル未配置のまま保存すると警告 Toast が出る(保存自体は可能、後から push すればよい)。
 
 **会話**: 手順 6 と同じ(マイクアイコン)。初回 PTT はモデルロードで**数秒〜10 秒程度
