@@ -1,0 +1,130 @@
+<svg viewBox="0 0 1260 660" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="設定画面で選んだ会話言語(JA/EN)が RealtimeServerSettings に保存され、次回PTT時に createController() が読み込んで OPENAI/LOCAL 用の ConversationController と LOCAL_AGENT 用の LocalAgentController それぞれの下流(instructions・STT言語・TTS言語・固定文言)に伝播する流れを示す図。SenseVoice STT だけは元々多言語モデルのため言語切替をせず常に auto 判定である。"
+     style="color:#334155; max-width:100%; height:auto;">
+  <title>会話言語(JA/EN)切り替えロジック</title>
+  <desc>
+    設定画面の Language 選択が RealtimeServerSettings.language に保存され、次回 PTT 押下時に
+    CarVoiceInteractionSession.createController() が読み直す。OPENAI/LOCAL モードは
+    ConversationController、LOCAL_AGENT モードは LocalAgentController にそれぞれ language を渡し、
+    各コントローラ配下の instructions・STT言語ヒント・TTS言語・固定文言に反映される。
+    SenseVoice STT のみ多言語モデルのため常に auto 判定で言語切替の対象外。
+  </desc>
+
+  <style>
+    .box { fill:#f3f4f6; stroke:#334155; stroke-width:1.5; }
+    .box.controller { fill:#e2e8f0; }
+    .box.exception { stroke-dasharray:5,4; }
+    .box-title { fill:#0f172a; font:600 13px system-ui,sans-serif; text-anchor:middle; }
+    .box-sub { fill:#334155; font:400 11px system-ui,sans-serif; text-anchor:middle; }
+    .leaf-title { fill:#0f172a; font:600 11.5px system-ui,sans-serif; text-anchor:middle; }
+    .leaf-sub { fill:#475569; font:400 10px system-ui,sans-serif; text-anchor:middle; }
+    .arrow { stroke:currentColor; stroke-width:1.5; fill:none; }
+    .arrow-label { fill:#334155; font:400 11px system-ui,sans-serif; text-anchor:middle; }
+    .group-label { fill:#0f172a; font:600 12px system-ui,sans-serif; text-anchor:middle; }
+    .legend-text { fill:#334155; font:400 11px system-ui,sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      svg { color:#94a3b8; }
+      .box { fill:#1e293b; stroke:#94a3b8; }
+      .box.controller { fill:#273549; }
+      .box-title, .leaf-title, .group-label { fill:#e2e8f0; }
+      .box-sub, .leaf-sub, .arrow-label, .legend-text { fill:#cbd5e1; }
+    }
+  </style>
+
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <polygon points="0,0 8,4 0,8" fill="currentColor" />
+    </marker>
+  </defs>
+
+  <!-- A: Settings UI -->
+  <rect class="box" x="330" y="10" width="540" height="56" rx="6" />
+  <text class="box-title" x="600" y="32">設定画面 ServerSettingsActivity</text>
+  <text class="box-sub" x="600" y="50">Conversation language: JA / EN を選択</text>
+
+  <line class="arrow" x1="600" y1="66" x2="600" y2="120" marker-end="url(#arrow)" />
+  <text class="arrow-label" x="700" y="98">保存 (Save 押下)</text>
+
+  <!-- B: Persisted settings -->
+  <rect class="box" x="380" y="124" width="440" height="56" rx="6" />
+  <text class="box-title" x="600" y="146">RealtimeServerSettings</text>
+  <text class="box-sub" x="600" y="164">language: ConversationLanguage (SharedPreferences)</text>
+
+  <line class="arrow" x1="600" y1="180" x2="600" y2="234" marker-end="url(#arrow)" />
+  <text class="arrow-label" x="740" y="212">次回 PTT 押下時に読み直す</text>
+
+  <!-- C: Router -->
+  <rect class="box" x="310" y="238" width="580" height="56" rx="6" />
+  <text class="box-title" x="600" y="260">CarVoiceInteractionSession.createController()</text>
+  <text class="box-sub" x="600" y="278">mode ごとに settings.language を各コントローラへ渡す</text>
+
+  <!-- Branch -->
+  <path class="arrow" d="M 520 294 L 260 350" marker-end="url(#arrow)" />
+  <text class="arrow-label" x="345" y="318">mode = OPENAI / LOCAL</text>
+
+  <path class="arrow" d="M 680 294 L 940 350" marker-end="url(#arrow)" />
+  <text class="arrow-label" x="855" y="318">mode = LOCAL_AGENT</text>
+
+  <!-- D: ConversationController -->
+  <rect class="box controller" x="90" y="356" width="340" height="56" rx="6" />
+  <text class="box-title" x="260" y="378">ConversationController(language)</text>
+  <text class="box-sub" x="260" y="396">OPENAI / LOCAL 共通</text>
+
+  <!-- E: LocalAgentController -->
+  <rect class="box controller" x="770" y="356" width="340" height="56" rx="6" />
+  <text class="box-title" x="940" y="378">LocalAgentController(language)</text>
+  <text class="box-sub" x="940" y="396">LOCAL_AGENT</text>
+
+  <!-- Fan-out D -->
+  <path class="arrow" d="M 150 412 L 105 456" marker-end="url(#arrow)" />
+  <path class="arrow" d="M 260 412 L 260 456" marker-end="url(#arrow)" />
+  <path class="arrow" d="M 370 412 L 415 456" marker-end="url(#arrow)" />
+
+  <!-- Fan-out E -->
+  <path class="arrow" d="M 880 412 L 770 456" marker-end="url(#arrow)" />
+  <path class="arrow" d="M 920 412 L 890 456" marker-end="url(#arrow)" />
+  <path class="arrow" d="M 960 412 L 1010 456" marker-end="url(#arrow)" />
+  <path class="arrow" d="M 1000 412 L 1130 456" marker-end="url(#arrow)" />
+
+  <!-- Leaves under D -->
+  <rect class="box" x="40" y="456" width="130" height="60" rx="5" />
+  <text class="leaf-title" x="105" y="480">instructions</text>
+  <text class="leaf-sub" x="105" y="496">(session.update) JA/EN文</text>
+
+  <rect class="box" x="195" y="456" width="130" height="60" rx="5" />
+  <text class="leaf-title" x="260" y="480">Whisper STT</text>
+  <text class="leaf-sub" x="260" y="496">language ヒント ja/en</text>
+
+  <rect class="box" x="350" y="456" width="130" height="60" rx="5" />
+  <text class="leaf-title" x="415" y="480">固定挨拶</text>
+  <text class="leaf-sub" x="415" y="496">JA/EN 文言</text>
+
+  <!-- Leaves under E -->
+  <rect class="box" x="705" y="456" width="130" height="60" rx="5" />
+  <text class="leaf-title" x="770" y="480">Gemma 指示</text>
+  <text class="leaf-sub" x="770" y="496">instruction JA/EN</text>
+
+  <rect class="box" x="825" y="456" width="130" height="60" rx="5" />
+  <text class="leaf-title" x="890" y="480">Supertonic TTS</text>
+  <text class="leaf-sub" x="890" y="496">lang ja/en</text>
+
+  <rect class="box exception" x="945" y="456" width="130" height="60" rx="5" />
+  <text class="leaf-title" x="1010" y="480">SenseVoice STT</text>
+  <text class="leaf-sub" x="1010" y="496">常に auto(切替なし)</text>
+
+  <rect class="box" x="1065" y="456" width="130" height="60" rx="5" />
+  <text class="leaf-title" x="1130" y="480">挨拶/フォールバック</text>
+  <text class="leaf-sub" x="1130" y="496">JA/EN 文言</text>
+
+  <!-- Legend -->
+  <line x1="60" y1="560" x2="100" y2="560" class="arrow" />
+  <text class="legend-text" x="108" y="564">言語設定 (ja/en) に応じて切替</text>
+
+  <line x1="60" y1="584" x2="100" y2="584" class="arrow" stroke-dasharray="5,4" />
+  <text class="legend-text" x="108" y="588">常に多言語モデルの自動判定(切替対象外)</text>
+
+  <text class="legend-text" x="60" y="620" font-weight="600">補足:</text>
+  <text class="legend-text" x="60" y="638">
+    ConversationController は OpenAI Realtime モードと Local(OpenAI互換ブローカー)モードの両方が共有する実装(session/ConversationController.kt)。
+  </text>
+</svg>

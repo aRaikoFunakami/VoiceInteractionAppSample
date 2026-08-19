@@ -8,6 +8,9 @@ import android.content.Context
  */
 enum class RealtimeServerMode { OPENAI, LOCAL, LOCAL_AGENT }
 
+/** 会話言語の設定。3モード全て(OpenAI/Local/LocalAgent)がこの設定に従う。 */
+enum class ConversationLanguage(val code: String) { JA("ja"), EN("en") }
+
 /**
  * Persists the server-switch setting so it survives app restarts without a rebuild (issue #43).
  * Written by :app's settings Activity, read by :via at session start. Plain SharedPreferences —
@@ -32,6 +35,11 @@ class RealtimeServerSettings(context: Context) {
         get() = prefs.getString(KEY_LOCAL_HOST, DEFAULT_LOCAL_HOST) ?: DEFAULT_LOCAL_HOST
         set(value) = prefs.edit().putString(KEY_LOCAL_HOST, value).apply()
 
+    var language: ConversationLanguage
+        get() = runCatching { ConversationLanguage.valueOf(prefs.getString(KEY_LANGUAGE, null) ?: "") }
+            .getOrDefault(ConversationLanguage.JA)
+        set(value) = prefs.edit().putString(KEY_LANGUAGE, value.name).apply()
+
     val brokerUrl: String
         get() = when (mode) {
             RealtimeServerMode.OPENAI -> "http://$localHost:8787/api/realtime/session"
@@ -50,6 +58,7 @@ class RealtimeServerSettings(context: Context) {
         const val PREFS_NAME = "realtime_server_settings"
         const val KEY_MODE = "mode"
         const val KEY_LOCAL_HOST = "local_host"
+        const val KEY_LANGUAGE = "language"
         const val DEFAULT_LOCAL_HOST = "10.0.2.2"
     }
 }

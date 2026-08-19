@@ -7,6 +7,9 @@
     <string name="server_settings_section_ondevice">Run without a server</string>
     <string name="server_settings_mode_local_agent">On-device Local Voice Agent (no server)</string>
     <string name="server_settings_local_host_hint">Broker host, e.g. 10.0.2.2 for the emulator or your PC\'s LAN IP for a real device (used by both OpenAI Realtime and the local server option)</string>
+    <string name="server_settings_section_language">Conversation language</string>
+    <string name="server_settings_language_ja">Japanese (日本語)</string>
+    <string name="server_settings_language_en">English</string>
     <string name="server_settings_save">Save</string>
     <string name="server_settings_saved">Saved</string>
     <string name="server_settings_saved_models_missing">Saved (models not pushed yet — run scripts/fetch_*.sh)</string>

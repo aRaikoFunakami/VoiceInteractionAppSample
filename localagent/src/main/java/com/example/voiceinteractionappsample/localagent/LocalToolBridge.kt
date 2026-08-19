@@ -29,6 +29,12 @@ object LocalToolBridge {
             "open_youtube_search ツールを検索キーワード付きで呼び出してください。" +
             "動画に関係ない話題ではツールを使ってはいけません。"
 
+    /** TOOL_INSTRUCTION の英語版(会話言語 EN のとき使用)。 */
+    const val TOOL_INSTRUCTION_EN =
+        "When the user asks to watch, find, or play a video, do not answer in text — " +
+            "always call the open_youtube_search tool with a search query. " +
+            "Never use the tool for topics unrelated to videos."
+
     /** ツール宣言(モデルへのスキーマ提示)専用。automaticToolCalling=false のため本体は呼ばれない。 */
     @Suppress("unused")
     class YouTubeToolSet : ToolSet {

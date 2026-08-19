@@ -84,6 +84,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
             return LocalAgentController(
                 context = context,
                 toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
+                language = serverSettings.language,
                 onAutoTerminated = { reason ->
                     Log.i(TAG, "local agent auto-terminated: $reason — hiding Voice Plate")
                     scope.launch { sessionActive = false; selfInitiatedHide = true; hide() }
@@ -96,6 +97,7 @@ class CarVoiceInteractionSession(context: Context) : VoiceInteractionSession(con
             realtimeCallsUrl = serverSettings.realtimeCallsUrl,
             toolSchemas = JSONArray().put(OpenYouTubeSearchToolSchema.toJson()),
             toolExecutor = DeviceToolExecutor(listOf(OpenYouTubeSearchTool(context))),
+            language = serverSettings.language,
             onAutoTerminated = { reason ->
                 // 実機で発見: watchdogは正しくRTC/micを止めていたが、誰もVoice Plateを隠さない
                 // ため画面だけが古い状態のまま残っていた。self-terminate側からもhide()を呼ぶ。

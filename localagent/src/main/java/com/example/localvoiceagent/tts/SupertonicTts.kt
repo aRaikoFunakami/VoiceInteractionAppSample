@@ -25,6 +25,9 @@ class SupertonicTts : SpeechSynthesizer {
 
     private var tts: OfflineTts? = null
 
+    /** 合成言語("ja"/"en")。セッション開始時に設定から反映される。 */
+    @Volatile var lang: String = "ja"
+
     private fun engine(): OfflineTts = tts ?: OfflineTts(
         null,
         OfflineTtsConfig(
@@ -54,7 +57,7 @@ class SupertonicTts : SpeechSynthesizer {
     override fun synthesize(text: String, sink: AudioSink) {
         val audio = engine().generateWithConfig(
             text,
-            GenerationConfig(sid = 0, numSteps = 8, extra = mapOf("lang" to "ja")),
+            GenerationConfig(sid = 0, numSteps = 8, extra = mapOf("lang" to lang)),
         )
         // float [-1,1] → int16(パイプライン基準フォーマット)
         val pcm = ShortArray(audio.samples.size) { i ->

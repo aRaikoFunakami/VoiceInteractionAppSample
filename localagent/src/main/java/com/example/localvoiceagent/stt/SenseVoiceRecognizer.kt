@@ -88,7 +88,10 @@ class SenseVoiceRecognizer : SpeechRecognizer {
                 modelConfig = OfflineModelConfig(
                     senseVoice = OfflineSenseVoiceModelConfig(
                         model = "$ASR/model.int8.onnx",
-                        language = "ja",
+                        // 多言語モデル(zh-en-ja-ko-yue)なので自動判別に任せる — recognizer は
+                        // プロセス生存の lazy 構築で、言語設定の切替時に作り直せないため、
+                        // "ja"/"en" を焼き込まず auto で両言語に対応する。
+                        language = "auto",
                         useInverseTextNormalization = true,
                     ),
                     tokens = "$ASR/tokens.txt",

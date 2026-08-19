@@ -19,6 +19,7 @@ import com.example.voiceinteractionappsample.session.DisconnectReason
 import com.example.voiceinteractionappsample.session.LoadingEngine
 import com.example.voiceinteractionappsample.session.MicPermissionGate
 import com.example.voiceinteractionappsample.session.SessionTimeoutPolicy
+import com.example.voiceinteractionappsample.realtime.ConversationLanguage
 import com.example.voiceinteractionappsample.session.VoiceSessionController
 import com.example.voiceinteractionappsample.tools.DeviceToolExecutor
 import java.util.concurrent.atomic.AtomicInteger
@@ -64,6 +65,8 @@ class LocalAgentController(
         LocalToolBridge.toTurn(LocalAgentRuntime.llm.askMessage(prompt))
     },
     private val toolExecutor: DeviceToolExecutor = DeviceToolExecutor(emptyList()),
+    // 会話言語。LLM システム指示・TTS 合成言語・固定文言に反映(設定画面の Language)。
+    private val language: ConversationLanguage = ConversationLanguage.JA,
     private val sessionTimeoutPolicy: SessionTimeoutPolicy = SessionTimeoutPolicy(),
     private val onAutoTerminated: (DisconnectReason) -> Unit = {},
 ) : VoiceSessionController {
@@ -155,7 +158,9 @@ class LocalAgentController(
                 _state.value = ConversationSessionState()
                 return@withLock
             }
-            LocalAgentRuntime.llm.resetConversation() // 会話履歴はセッションごとにリセット
+            // 会話履歴はセッションごとにリセット(システム指示の言語もここで反映される)
+            LocalAgentRuntime.llm.resetConversation(language)
+            LocalAgentRuntime.ttsEngine.lang = language.code
 
             if (!capture.start()) {
                 abandonAudioFocus()
@@ -182,7 +187,7 @@ class LocalAgentController(
                 it.copy(
                     connection = ConnectionState.CONNECTED,
                     audioInput = AudioInputState.CAPTURING,
-                    assistantTranscript = GREETING_TEXT,
+                    assistantTranscript = greetingText(language),
                     // ponytail: キャッシュヒット(2回目以降のPTT)では onEngineReady が呼ばれず
                     // pendingEngines が起動直後の全件のまま残るので、ここで明示的に畳む。
                     pendingEngines = emptySet(),
@@ -263,7 +268,7 @@ class LocalAgentController(
         Log.i(TAG, "llm ask: \"$text\"")
         val turn = runCatching { ask(text) }.getOrElse { e ->
             Log.w(TAG, "llm ask failed", e)
-            LocalToolBridge.LlmTurn(toolCall = null, replyText = FALLBACK_TEXT)
+            LocalToolBridge.LlmTurn(toolCall = null, replyText = fallbackText(language))
         }
         if (myGen != generation.get()) {
             Log.i(TAG, "late reply discarded") // 推論中に cancel() された(打ち切り or 破棄)
@@ -427,7 +432,16 @@ class LocalAgentController(
         private const val WATCHDOG_TICK_MS = 50L
 
         /** 既存 OpenAI モードと同じ固定挨拶(テキスト表示のみ、計画 §10-3)。 */
-        const val GREETING_TEXT = "こんにちは、何か御用ですか"
+        fun greetingText(language: ConversationLanguage): String = when (language) {
+            ConversationLanguage.JA -> "こんにちは、何か御用ですか"
+            ConversationLanguage.EN -> "Hello, how can I help you?"
+        }
+
         const val FALLBACK_TEXT = "すみません、うまく考えられませんでした。"
+
+        fun fallbackText(language: ConversationLanguage): String = when (language) {
+            ConversationLanguage.JA -> FALLBACK_TEXT
+            ConversationLanguage.EN -> "Sorry, I couldn't come up with an answer."
+        }
     }
 }

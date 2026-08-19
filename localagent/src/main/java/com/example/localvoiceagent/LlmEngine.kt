@@ -1,6 +1,7 @@
 package com.example.localvoiceagent
 
 import com.example.voiceinteractionappsample.localagent.LocalToolBridge
+import com.example.voiceinteractionappsample.realtime.ConversationLanguage
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
@@ -27,15 +28,24 @@ class LlmEngine {
     companion object {
         const val MODEL_PATH = "/data/local/tmp/llm/gemma-4-E2B-it.litertlm"
 
-        // 音声会話向け: 短く話し言葉で返す
+        // 音声会話向け: 短く話し言葉で返す。言語は設定(ConversationLanguage)に従う。
         const val SYSTEM_INSTRUCTION =
             "あなたは音声会話アシスタントです。日本語で、2文以内の短い話し言葉で答えてください。"
+        const val SYSTEM_INSTRUCTION_EN =
+            "You are a voice conversation assistant. Answer in English, " +
+                "in short spoken language within two sentences."
+
+        fun systemInstruction(language: ConversationLanguage): String = when (language) {
+            ConversationLanguage.JA -> SYSTEM_INSTRUCTION + LocalToolBridge.TOOL_INSTRUCTION
+            ConversationLanguage.EN -> SYSTEM_INSTRUCTION_EN + LocalToolBridge.TOOL_INSTRUCTION_EN
+        }
 
         fun modelAvailable(): Boolean = File(MODEL_PATH).canRead()
     }
 
     private var engine: Engine? = null
     @Volatile private var conversation: Conversation? = null
+    private var language: ConversationLanguage = ConversationLanguage.JA
 
     /** モデルロード。数秒〜10 秒程度かかる。 */
     @Synchronized
@@ -52,9 +62,7 @@ class LlmEngine {
     // DeviceToolExecutor 経由(automaticToolCalling = false)。
     private fun newConversation(e: Engine): Conversation = e.createConversation(
         ConversationConfig(
-            systemInstruction = Contents.of(
-                SYSTEM_INSTRUCTION + LocalToolBridge.TOOL_INSTRUCTION,
-            ),
+            systemInstruction = Contents.of(systemInstruction(language)),
             tools = listOf(tool(LocalToolBridge.YouTubeToolSet())),
             automaticToolCalling = false,
         ),
@@ -83,7 +91,8 @@ class LlmEngine {
 
     /** 会話履歴をリセットする(セッション開始ごとに呼ぶ。履歴の無限成長防止)。 */
     @Synchronized
-    fun resetConversation() {
+    fun resetConversation(language: ConversationLanguage = this.language) {
+        this.language = language
         val e = engine ?: return
         runCatching { conversation?.close() }
         conversation = newConversation(e)
