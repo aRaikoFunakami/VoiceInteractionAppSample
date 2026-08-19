@@ -5,4 +5,8 @@
     <string name="voice_plate_engine_llm">LLM</string>
     <string name="voice_plate_engine_stt">Speech recognition (STT)</string>
     <string name="voice_plate_engine_tts">Speech synthesis (TTS)</string>
+    <string name="voice_plate_connection">Connection: %1$s</string>
+    <string name="voice_plate_you_label">You: </string>
+    <string name="voice_plate_interruptions">⚠️ Interruptions detected: %1$d</string>
+    <string name="voice_plate_tokens">Tokens: %1$d (approx. $%2$s)</string>
 </resources>
