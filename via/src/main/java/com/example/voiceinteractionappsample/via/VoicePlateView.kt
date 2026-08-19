@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.util.AttributeSet
 import android.widget.TextView
 import com.example.voiceinteractionappsample.session.ConversationSessionState
+import com.example.voiceinteractionappsample.session.LoadingEngine
 
 /**
  * Voice Plate (16節): shows the conversation display state (Listening/Thinking/Speaking/
@@ -31,6 +32,17 @@ class VoicePlateView @JvmOverloads constructor(
             append(plateState.name)
             append("\n接続: ")
             append(session.connection.name)
+            // LOCAL_AGENT の初回起動のみ populate される(pendingEngines は OpenAI モードでは
+            // 常に空)。3 エンジンを並列ロードしていること・どれが終わったかをここで見せる。
+            if (session.pendingEngines.isNotEmpty()) {
+                append("\n\n")
+                append(context.getString(R.string.voice_plate_loading_title))
+                for (engine in LoadingEngine.entries) {
+                    append("\n")
+                    append(if (engine in session.pendingEngines) "… " else "✓ ")
+                    append(context.getString(engineLabelRes(engine)))
+                }
+            }
             if (session.assistantTranscript.isNotBlank()) {
                 append("\n\nAI: ")
                 append(session.assistantTranscript)
@@ -52,5 +64,11 @@ class VoicePlateView @JvmOverloads constructor(
                 append(")")
             }
         }
+    }
+
+    private fun engineLabelRes(engine: LoadingEngine): Int = when (engine) {
+        LoadingEngine.LLM -> R.string.voice_plate_engine_llm
+        LoadingEngine.STT -> R.string.voice_plate_engine_stt
+        LoadingEngine.TTS -> R.string.voice_plate_engine_tts
     }
 }
