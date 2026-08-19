@@ -4,4 +4,8 @@
     <string name="voice_plate_engine_llm">LLM</string>
     <string name="voice_plate_engine_stt">音声認識(STT)</string>
     <string name="voice_plate_engine_tts">音声合成(TTS)</string>
+    <string name="voice_plate_connection">接続: %1$s</string>
+    <string name="voice_plate_you_label">あなた: </string>
+    <string name="voice_plate_interruptions">⚠️ 割り込み検出: %1$d回</string>
+    <string name="voice_plate_tokens">トークン: %1$d (約$%2$s)</string>
 </resources>

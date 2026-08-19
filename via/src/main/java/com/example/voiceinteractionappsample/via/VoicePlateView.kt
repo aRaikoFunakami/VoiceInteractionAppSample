@@ -30,8 +30,8 @@ class VoicePlateView @JvmOverloads constructor(
     fun render(plateState: VoicePlateState, session: ConversationSessionState) {
         text = buildString {
             append(plateState.name)
-            append("\n接続: ")
-            append(session.connection.name)
+            append("\n")
+            append(context.getString(R.string.voice_plate_connection, session.connection.name))
             // LOCAL_AGENT の初回起動のみ populate される(pendingEngines は OpenAI モードでは
             // 常に空)。3 エンジンを並列ロードしていること・どれが終わったかをここで見せる。
             if (session.pendingEngines.isNotEmpty()) {
@@ -48,20 +48,23 @@ class VoicePlateView @JvmOverloads constructor(
                 append(session.assistantTranscript)
             }
             if (session.userTranscript.isNotBlank()) {
-                append("\nあなた: ")
+                append("\n")
+                append(context.getString(R.string.voice_plate_you_label))
                 append(session.userTranscript)
             }
             if (session.interruptionCount > 0) {
-                append("\n\n⚠️ 割り込み検出: ")
-                append(session.interruptionCount)
-                append("回")
+                append("\n\n")
+                append(context.getString(R.string.voice_plate_interruptions, session.interruptionCount))
             }
             if (session.totalTokens > 0) {
-                append("\n\nトークン: ")
-                append(session.totalTokens)
-                append(" (約$")
-                append(String.format("%.4f", session.totalCostUsd))
-                append(")")
+                append("\n\n")
+                append(
+                    context.getString(
+                        R.string.voice_plate_tokens,
+                        session.totalTokens,
+                        String.format("%.4f", session.totalCostUsd),
+                    ),
+                )
             }
         }
     }
