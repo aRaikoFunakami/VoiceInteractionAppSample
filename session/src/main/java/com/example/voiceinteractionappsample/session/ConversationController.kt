@@ -170,6 +170,27 @@ class ConversationController(
         // 5秒超で間に合わなかったとき、未設定セッション(人格・tools・文字起こし無し)に
         // 応答だけ生成させてしまうのを防ぐ。
         if (configured) {
+            // LOCALモード実機で発見: instructions のみ(userメッセージゼロ)の response.create は
+            // local_realtime_llm 側で LLM のチャットテンプレートに拒否される
+            // ("No user query found in messages" → response.done status=failed)。OpenAI 本家は
+            // userなしを許容するが、両対応のため user アイテムを1件注入してから応答を要求する。
+            newConnection.events.send(
+                JSONObject()
+                    .put("type", "conversation.item.create")
+                    .put(
+                        "item",
+                        JSONObject()
+                            .put("type", "message")
+                            .put("role", "user")
+                            .put(
+                                "content",
+                                JSONArray().put(
+                                    JSONObject().put("type", "input_text").put("text", "Please greet me."),
+                                ),
+                            ),
+                    )
+                    .toString(),
+            )
             newConnection.events.send(
                 JSONObject()
                     .put("type", "response.create")
