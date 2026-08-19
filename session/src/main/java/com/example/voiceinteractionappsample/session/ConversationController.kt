@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.example.voiceinteractionappsample.audio.AecMode
 import com.example.voiceinteractionappsample.audio.WebRtcAudioEngine
+import com.example.voiceinteractionappsample.realtime.ConversationLanguage
 import com.example.voiceinteractionappsample.realtime.RealtimeConnection
 import com.example.voiceinteractionappsample.realtime.RealtimeCredentialProvider
 import com.example.voiceinteractionappsample.realtime.RealtimeEventCodec
@@ -77,6 +78,8 @@ class ConversationController(
      */
     private val toolSchemas: JSONArray = JSONArray(),
     private val toolExecutor: DeviceToolExecutor = DeviceToolExecutor(emptyList()),
+    // 会話言語(instructions・STT言語ヒント・固定挨拶に反映)。設定画面の Language に従う。
+    private val language: ConversationLanguage = ConversationLanguage.JA,
     /**
      * Called when [cancel] runs for any reason OTHER than [DisconnectReason.USER_CANCEL] —
      * i.e. the connection tore itself down (idle timeout, max duration, ICE failure) without
@@ -164,7 +167,7 @@ class ConversationController(
                 audioInput = AudioInputState.CAPTURING,
                 // ユーザー要望: マイクが受付状態になった時点で画面に固定挨拶を出す。実際の
                 // モデル応答が来ればすぐ上書きされる — 同じ表示欄を再利用しているだけ。
-                assistantTranscript = GREETING_TEXT,
+                assistantTranscript = greetingText(language),
             )
         }
 
@@ -275,7 +278,7 @@ class ConversationController(
         RealtimeEventCodec.encodeSessionUpdate(
             JSONObject()
                 .put("type", "realtime")
-                .put("instructions", CAR_ASSISTANT_INSTRUCTIONS)
+                .put("instructions", carAssistantInstructions(language))
                 .put("tools", toolSchemas)
                 .put(
                     "audio",
@@ -289,7 +292,7 @@ class ConversationController(
                             // ユーザー要望2: 英語しか認識しない対策 — STTに言語をヒントする。
                             .put(
                                 "transcription",
-                                JSONObject().put("model", "whisper-1").put("language", "ja"),
+                                JSONObject().put("model", "whisper-1").put("language", language.code),
                             ),
                     ),
                 )
@@ -422,15 +425,25 @@ class ConversationController(
         // 10秒アイドルタイムアウトに対して検出遅延が相対的に大きくならないよう短めにする。
         const val WATCHDOG_CHECK_INTERVAL_MS = 2_000L
 
-        const val GREETING_TEXT = "こんにちは、何か御用ですか"
+        fun greetingText(language: ConversationLanguage): String = when (language) {
+            ConversationLanguage.JA -> "こんにちは、何か御用ですか"
+            ConversationLanguage.EN -> "Hello, how can I help you?"
+        }
 
         // ユーザー要望3: 車のAIアシスタントとして振る舞わせる。ユーザー要望2の「日本語で
         // 話す」もここで指示する — Realtime APIには出力言語を直接指定するフィールドが無く、
-        // instructionsで指示するのが標準的なやり方。
-        const val CAR_ASSISTANT_INSTRUCTIONS = """
+        // instructionsで指示するのが標準的なやり方。言語は設定に従って切り替える。
+        fun carAssistantInstructions(language: ConversationLanguage): String = when (language) {
+            ConversationLanguage.JA -> """
 あなたは自動車に搭載されている音声AIアシスタントです。運転者や同乗者の質問や指示に、
 必ず日本語で、簡潔かつ分かりやすく答えてください。運転の妨げにならないよう、長い説明は
 避け、要点だけを話してください。
-        """
+            """
+            ConversationLanguage.EN -> """
+You are a voice AI assistant built into a car. Always answer the driver's and passengers'
+questions and requests in English, concisely and clearly. Avoid long explanations so you
+don't distract from driving — stick to the essentials.
+            """
+        }
     }
 }

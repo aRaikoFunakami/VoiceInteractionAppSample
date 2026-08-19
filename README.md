@@ -82,5 +82,6 @@ AAOS Emulator を既定の Voice Interaction App として登録し、マイク�
 - [docs/acceptance-checklist.md](docs/acceptance-checklist.md) — E2E 受け入れ条件チェックリスト
 - [third_party/libwebrtc/README.md](third_party/libwebrtc/README.md) — 採用している WebRTC ライブラリの方針
 - [docs/local-voice-agent-dev-plan.md](docs/local-voice-agent-dev-plan.md) — Local Voice Agent 対応の開発計画書（issue #46〜#51）
+- [docs/conversation-language.md](docs/conversation-language.md) — 会話言語（JA/EN）切り替えロジック（3モード共通）
 - [docs/third-party-licenses-local-agent.md](docs/third-party-licenses-local-agent.md) — Local Voice Agent のサードパーティライセンス
 - [third_party/local_audio_engine/README.md](third_party/local_audio_engine/README.md) — オンデバイス音響エンジン（WebRTC APM）の方針
