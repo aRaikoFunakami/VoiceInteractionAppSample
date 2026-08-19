@@ -32,6 +32,9 @@ enum class ConversationState {
     CANCELLING,
 }
 
+/** LOCAL_AGENT 専用: オンデバイス推論エンジン。OpenAI モードでは一切使われない。 */
+enum class LoadingEngine { LLM, STT, TTS }
+
 /**
  * The four state axes held together (10節). Deliberately NOT one combined enum — full-duplex
  * barge-in requires [AudioInputState.CAPTURING] and [AudioOutputState.PLAYING] to be true
@@ -54,4 +57,6 @@ data class ConversationSessionState(
     val totalTokens: Int = 0,
     /** セッション累計の推定課金額USD（デバッグ表示用）。RealtimeUsageCost参照。 */
     val totalCostUsd: Double = 0.0,
+    /** LOCAL_AGENT の起動中、まだロード完了していないエンジン。OpenAI モードでは常に空。 */
+    val pendingEngines: Set<LoadingEngine> = emptySet(),
 )

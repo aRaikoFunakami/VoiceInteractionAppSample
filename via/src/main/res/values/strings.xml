@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="via_service_label">VIA Realtime Sample</string>
+    <string name="voice_plate_loading_title">Starting voice engines…</string>
+    <string name="voice_plate_engine_llm">LLM</string>
+    <string name="voice_plate_engine_stt">Speech recognition (STT)</string>
+    <string name="voice_plate_engine_tts">Speech synthesis (TTS)</string>
 </resources>
