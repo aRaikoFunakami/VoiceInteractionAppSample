@@ -20,6 +20,7 @@ import com.example.voiceinteractionappsample.session.LoadingEngine
 import com.example.voiceinteractionappsample.session.MicPermissionGate
 import com.example.voiceinteractionappsample.session.SessionTimeoutPolicy
 import com.example.voiceinteractionappsample.realtime.ConversationLanguage
+import com.example.voiceinteractionappsample.realtime.greetingText
 import com.example.voiceinteractionappsample.session.VoiceSessionController
 import com.example.voiceinteractionappsample.tools.DeviceToolExecutor
 import java.util.concurrent.atomic.AtomicInteger
@@ -183,11 +184,12 @@ class LocalAgentController(
             val now = SystemClock.elapsedRealtime()
             sessionStartedAtMs = now
             lastActivityAtMs = now
+            val greeting = greetingText(language)
             _state.update {
                 it.copy(
                     connection = ConnectionState.CONNECTED,
                     audioInput = AudioInputState.CAPTURING,
-                    assistantTranscript = greetingText(language),
+                    assistantTranscript = greeting,
                     // 挨拶もTTS再生するので PLAYING を立てる — watchdog のバージイン検出と
                     // 再生完了検出(PLAYING→IDLE)を通常応答と同じ経路で効かせる。
                     audioOutput = AudioOutputState.PLAYING,
@@ -197,7 +199,7 @@ class LocalAgentController(
                 )
             }
             Log.i(TAG, "tts speak greeting")
-            ttsPlayer.speak(greetingText(language))
+            ttsPlayer.speak(greeting)
             watchdogJob = scope.launch { watchdogLoop() }
             LocalAgentRuntime.sessionActive = true // onTrimMemory の解放をセッション中は抑止
             Log.i(TAG, "local agent session started (timeout=$sessionTimeoutPolicy)")
@@ -297,6 +299,13 @@ class LocalAgentController(
             turn.replyText
         }
         touchActivity()
+        // ask() 後の世代チェックからここまでの間に cancel() が完走していると、リセット済みの
+        // state を PLAYING で上書きし、停止済み render パイプラインへフレームを積んでしまう。
+        // 再チェックで窓を数μsまで狭める(mutex を取らない限りゼロにはならない)。
+        if (myGen != generation.get()) {
+            Log.i(TAG, "late reply discarded (cancelled before playback)")
+            return
+        }
         _state.update {
             it.copy(
                 conversation = ConversationState.IDLE,
@@ -439,12 +448,6 @@ class LocalAgentController(
         private const val SAMPLE_RATE = 48000
         private const val FRAME_SAMPLES = 480
         private const val WATCHDOG_TICK_MS = 50L
-
-        /** 既存 OpenAI モードと同じ固定挨拶(テキスト表示のみ、計画 §10-3)。 */
-        fun greetingText(language: ConversationLanguage): String = when (language) {
-            ConversationLanguage.JA -> "こんにちは、何か御用ですか"
-            ConversationLanguage.EN -> "Hello, how can I help you?"
-        }
 
         const val FALLBACK_TEXT = "すみません、うまく考えられませんでした。"
 
