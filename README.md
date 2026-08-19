@@ -14,8 +14,10 @@ AAOS には、Google Assistant の代わりに自作のアプリを既定の音�
 - セッション累計のトークン数・推定課金額(USD)をデバッグ表示
 - アイドルタイムアウト・最大セッション時間による課金の歯止め
 - 設定画面（Settings > Assistant & voice の歯車アイコン）から OpenAI Realtime ⇄ ローカル
-  サーバー（`local_realtime_llm` 等）を再ビルド不要で切り替え可能（手順は
-  [docs/how-to-run.md](docs/how-to-run.md) の「接続先サーバーを切り替える」を参照）
+  サーバーを再ビルド不要で切り替え可能（手順は
+  [docs/how-to-run.md](docs/how-to-run.md) の「接続先サーバーを切り替える」を参照）。
+  ローカルサーバーには [local_realtime_llm](https://github.com/aRaikoFunakami/local_realtime_llm)
+  を使う
 - **完全オンデバイスの Local Voice Agent モード**（サーバー・APIキー・ネットワーク不要）。
   SenseVoice STT + Gemma 4 E2B (LiteRT-LM) + supertonic-3-ja TTS + WebRTC APM(AEC3) を
   デバイス内で動かし、barge-in と YouTube 検索ツールコールまで同じ Voice Plate 上で動作する。
