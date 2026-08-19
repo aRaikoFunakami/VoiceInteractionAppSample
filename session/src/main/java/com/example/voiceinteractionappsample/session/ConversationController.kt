@@ -18,6 +18,7 @@ import com.example.voiceinteractionappsample.realtime.RealtimeVadConfig
 import com.example.voiceinteractionappsample.realtime.RealtimeEvent
 import com.example.voiceinteractionappsample.realtime.RealtimeWebRtcClient
 import com.example.voiceinteractionappsample.realtime.WebRtcFactoryProvider
+import com.example.voiceinteractionappsample.realtime.greetingText
 import com.example.voiceinteractionappsample.tools.DeviceToolExecutor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -159,7 +160,28 @@ class ConversationController(
         val client = RealtimeWebRtcClient(factory, credentialProvider, realtimeCallsUrl)
         val newConnection = client.connect(this, track)
         connection = newConnection
-        newConnection.events.send(buildSessionUpdateEvent())
+        val greeting = greetingText(language)
+        val configured = newConnection.events.send(buildSessionUpdateEvent())
+        // 初回挨拶を音声でも出す。server VAD はユーザーが話すまで応答を生成しないため、
+        // response.create で初回応答を明示的にトリガーする。per-response instructions なので
+        // session.update 側の人格・tools とは独立。LLM のため文言の完全一致は保証されないが、
+        // assistantTranscript は response.audio_transcript.done の実発話で上書きされる。
+        // session.update が drop された場合は挨拶も送らない — DataChannel の OPEN が
+        // 5秒超で間に合わなかったとき、未設定セッション(人格・tools・文字起こし無し)に
+        // 応答だけ生成させてしまうのを防ぐ。
+        if (configured) {
+            newConnection.events.send(
+                JSONObject()
+                    .put("type", "response.create")
+                    .put(
+                        "response",
+                        JSONObject().put("instructions", "Greet the user with exactly: \"$greeting\". Say nothing else."),
+                    )
+                    .toString(),
+            )
+        } else {
+            Log.w(TAG, "session.update dropped; skipping greeting response.create")
+        }
 
         _state.update {
             it.copy(
@@ -167,7 +189,7 @@ class ConversationController(
                 audioInput = AudioInputState.CAPTURING,
                 // ユーザー要望: マイクが受付状態になった時点で画面に固定挨拶を出す。実際の
                 // モデル応答が来ればすぐ上書きされる — 同じ表示欄を再利用しているだけ。
-                assistantTranscript = greetingText(language),
+                assistantTranscript = greeting,
             )
         }
 
@@ -246,6 +268,10 @@ class ConversationController(
             // ここが配線されていなかったためsession.updateの`tools`が常に空で、モデルは
             // ツールの存在自体を知らなかった（実機ログで`"tools":[]`を確認）。
             "response.function_call_arguments.done" -> handleFunctionCall(event)
+            // サーバーのerrorイベント(挨拶response.createとVADの衝突による
+            // conversation_already_has_active_response 等)が無言でelseに落ちて
+            // 切り分け不能だったため、必ずログに残す。
+            "error" -> Log.w(TAG, "server error event: $event")
             else -> Unit
         }
     }
@@ -424,11 +450,6 @@ class ConversationController(
         const val TAG = "ConversationController"
         // 10秒アイドルタイムアウトに対して検出遅延が相対的に大きくならないよう短めにする。
         const val WATCHDOG_CHECK_INTERVAL_MS = 2_000L
-
-        fun greetingText(language: ConversationLanguage): String = when (language) {
-            ConversationLanguage.JA -> "こんにちは、何か御用ですか"
-            ConversationLanguage.EN -> "Hello, how can I help you?"
-        }
 
         // ユーザー要望3: 車のAIアシスタントとして振る舞わせる。ユーザー要望2の「日本語で
         // 話す」もここで指示する — Realtime APIには出力言語を直接指定するフィールドが無く、

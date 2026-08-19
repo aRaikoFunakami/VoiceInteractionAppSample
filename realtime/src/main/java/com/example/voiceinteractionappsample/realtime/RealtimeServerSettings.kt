@@ -12,6 +12,16 @@ enum class RealtimeServerMode { OPENAI, LOCAL, LOCAL_AGENT }
 enum class ConversationLanguage(val code: String) { JA("ja"), EN("en") }
 
 /**
+ * セッション開始時の固定挨拶(表示と読み上げの両方に使う)。以前は LocalAgentController /
+ * ConversationController の companion に同文がコピーされていて、片方だけ編集すると
+ * モード間で挨拶がズレる罠があったため、両者が依存するここに一本化。
+ */
+fun greetingText(language: ConversationLanguage): String = when (language) {
+    ConversationLanguage.JA -> "こんにちは、何か御用ですか"
+    ConversationLanguage.EN -> "Hello, how can I help you?"
+}
+
+/**
  * Persists the server-switch setting so it survives app restarts without a rebuild (issue #43).
  * Written by :app's settings Activity, read by :via at session start. Plain SharedPreferences —
  * it's two small values, no need for a datastore dependency.

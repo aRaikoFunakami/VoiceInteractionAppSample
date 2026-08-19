@@ -59,18 +59,21 @@ class RealtimeEventChannel(private val dataChannel: DataChannel) {
      * タイムアウト付き — 別件で実機確認済みの通りICEがCHECKINGのまま繋がらないケースが
      * 実在するため、無条件にawaitすると[cancel]のteardown経路（response.cancel送信）が
      * 永久にハングしてしまう。開かないまま[SEND_OPEN_TIMEOUT_MS]経過したら諦めて捨てる。
+     *
+     * @return 送信できたら true。false = drop（後続イベントの送信可否を呼び出し側が
+     *   判断できるように返す — session.update が落ちたのに response.create だけ届く、を防ぐ）。
      */
-    suspend fun send(json: String) {
+    suspend fun send(json: String): Boolean {
         val ready = withTimeoutOrNull(SEND_OPEN_TIMEOUT_MS) { awaitOpen() }
         if (ready == null) {
             Log.w(TAG, "send() dropped: DataChannel never reached OPEN within ${SEND_OPEN_TIMEOUT_MS}ms")
-            return
+            return false
         }
         val buffer = DataChannel.Buffer(
             ByteBuffer.wrap(json.toByteArray(StandardCharsets.UTF_8)),
             false,
         )
-        dataChannel.send(buffer)
+        return dataChannel.send(buffer)
     }
 
     fun incoming(): Flow<String> = messages.receiveAsFlow()
