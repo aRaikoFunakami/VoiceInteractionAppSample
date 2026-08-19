@@ -13,10 +13,12 @@ enum class RealtimeServerMode { OPENAI, LOCAL, LOCAL_AGENT }
  * Written by :app's settings Activity, read by :via at session start. Plain SharedPreferences —
  * it's two small values, no need for a datastore dependency.
  *
- * OpenAI mode keeps the previous hardcoded AVD broker host (`10.0.2.2`, unaffected by this
- * setting — real-device/real-broker hosts are out of scope per the issue, only local-server
- * switching is). Local mode points both broker and WebRTC calls endpoint at the host the user
- * enters, per docs/broker-contract.md and local_realtime_llm's ports (8787 broker, 8765 calls).
+ * OpenAI mode used to hardcode the broker host to the AVD loopback address (`10.0.2.2`), which
+ * made a real device unable to reach the broker at all (no way to enter its own address). Both
+ * OpenAI and Local mode now point the broker at [localHost] — it defaults to `10.0.2.2` so
+ * emulator use is unaffected, and a real device just needs the host PC's LAN IP entered instead
+ * (which `backend/local_broker.py` prints on startup). Only the WebRTC calls endpoint still
+ * differs: OpenAI mode talks to OpenAI's own servers for that, Local mode to [localHost].
  */
 class RealtimeServerSettings(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -32,7 +34,7 @@ class RealtimeServerSettings(context: Context) {
 
     val brokerUrl: String
         get() = when (mode) {
-            RealtimeServerMode.OPENAI -> "http://$AVD_HOST_LOOPBACK:8787/api/realtime/session"
+            RealtimeServerMode.OPENAI -> "http://$localHost:8787/api/realtime/session"
             RealtimeServerMode.LOCAL -> "http://$localHost:8787/api/realtime/session"
             RealtimeServerMode.LOCAL_AGENT -> "" // オンデバイス動作のためサーバー不要 (#47)
         }
@@ -49,6 +51,5 @@ class RealtimeServerSettings(context: Context) {
         const val KEY_MODE = "mode"
         const val KEY_LOCAL_HOST = "local_host"
         const val DEFAULT_LOCAL_HOST = "10.0.2.2"
-        const val AVD_HOST_LOOPBACK = "10.0.2.2"
     }
 }

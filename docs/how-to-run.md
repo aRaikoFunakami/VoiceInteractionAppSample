@@ -87,13 +87,15 @@ Settings > Assistant & voice の「Voice input」行が消えていたらこれ�
 
 ## 5. 接続先サーバーを切り替える（OpenAI ⇄ ローカル、任意）
 
-デフォルトはOpenAI Realtime（`backend/local_broker.py`向け）。`local_realtime_llm`のような
+デフォルトはOpenAI Realtime（`backend/local_broker.py`向け）。
+[local_realtime_llm](https://github.com/aRaikoFunakami/local_realtime_llm)のような
 ローカルサーバーに向けたい場合、再ビルド不要で設定画面から切り替えられる（Issue #43）。
 
 **GUIから（実機検証済み）**: 手順4で「Digital assistant app」にこのアプリを選択済みの状態
 にした上で、**同じ行の右端に出る歯車アイコン**をタップ →「Realtime Server」画面が開く。
-OpenAI Realtime / Local のどちらかを選び、Local選択時はローカルサーバーのホスト（例:
-`10.0.2.2`、AVDからホストPCを指す予約アドレス）を入力してSAVE。
+OpenAI Realtime / Local のどちらかを選び、ブローカー（`backend/local_broker.py`）のホストを
+入力してSAVE。AVDなら`10.0.2.2`（ホストPCを指す予約アドレス）、実機なら`local_broker.py`
+起動時にターミナルへ出力されるLAN IPを入力する（10.0.2.2は実機からは届かないため）。
 
 **adbから直接開く**（歯車を探さず一発で確認したいとき）:
 
