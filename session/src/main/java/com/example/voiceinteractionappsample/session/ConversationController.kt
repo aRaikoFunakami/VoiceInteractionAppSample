@@ -160,6 +160,22 @@ class ConversationController(
         val newConnection = client.connect(this, track)
         connection = newConnection
         newConnection.events.send(buildSessionUpdateEvent())
+        // 初回挨拶を音声でも出す。server VAD はユーザーが話すまで応答を生成しないため、
+        // response.create で初回応答を明示的にトリガーする。per-response instructions なので
+        // session.update 側の人格・tools とは独立。LLM のため文言の完全一致は保証されないが、
+        // assistantTranscript は response.audio_transcript.done の実発話で上書きされる。
+        newConnection.events.send(
+            JSONObject()
+                .put("type", "response.create")
+                .put(
+                    "response",
+                    JSONObject().put(
+                        "instructions",
+                        "Greet the user with exactly: \"${greetingText(language)}\". Say nothing else.",
+                    ),
+                )
+                .toString(),
+        )
 
         _state.update {
             it.copy(

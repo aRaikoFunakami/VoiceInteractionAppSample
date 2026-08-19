@@ -188,11 +188,16 @@ class LocalAgentController(
                     connection = ConnectionState.CONNECTED,
                     audioInput = AudioInputState.CAPTURING,
                     assistantTranscript = greetingText(language),
+                    // 挨拶もTTS再生するので PLAYING を立てる — watchdog のバージイン検出と
+                    // 再生完了検出(PLAYING→IDLE)を通常応答と同じ経路で効かせる。
+                    audioOutput = AudioOutputState.PLAYING,
                     // ponytail: キャッシュヒット(2回目以降のPTT)では onEngineReady が呼ばれず
                     // pendingEngines が起動直後の全件のまま残るので、ここで明示的に畳む。
                     pendingEngines = emptySet(),
                 )
             }
+            Log.i(TAG, "tts speak greeting")
+            ttsPlayer.speak(greetingText(language))
             watchdogJob = scope.launch { watchdogLoop() }
             LocalAgentRuntime.sessionActive = true // onTrimMemory の解放をセッション中は抑止
             Log.i(TAG, "local agent session started (timeout=$sessionTimeoutPolicy)")
@@ -256,6 +261,10 @@ class LocalAgentController(
         }
         val myGen = generation.get()
         touchActivity()
+        // watchdog の barge-in 成立(200ms)より先に STT 確定が届いた場合、state だけ IDLE に
+        // すると再生中フレームが TtsPlayer に残り、次の応答がその後ろに連結される。ここで
+        // 明示的に打ち切る(再生していなければ no-op)。
+        ttsPlayer.cancel()
         _state.update {
             it.copy(
                 conversation = ConversationState.MODEL_PROCESSING,
