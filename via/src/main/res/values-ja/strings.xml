@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_plate_loading_title">音声エンジンを起動中…</string>
+    <string name="voice_plate_engine_llm">LLM</string>
+    <string name="voice_plate_engine_stt">音声認識(STT)</string>
+    <string name="voice_plate_engine_tts">音声合成(TTS)</string>
+</resources>

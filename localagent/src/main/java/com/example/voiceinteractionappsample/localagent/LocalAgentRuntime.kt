@@ -5,11 +5,13 @@ import com.example.localvoiceagent.LocalAudioEngine
 import com.example.localvoiceagent.stt.SenseVoiceRecognizer
 import com.example.localvoiceagent.tts.SupertonicTts
 import com.example.localvoiceagent.tts.TtsPlayer
+import com.example.voiceinteractionappsample.session.LoadingEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 
 /**
  * 推論エンジン群のプロセススコープ管理(issue #48, docs/local-voice-agent-dev-plan.md §3.4)。
@@ -44,15 +46,20 @@ object LocalAgentRuntime {
     @Volatile private var initDeferred: Deferred<Unit>? = null
 
     /**
-     * LLM ロード + STT/TTS の遅延初期化先出し。初回のみ数秒〜10 秒ブロック(呼び出し元は
-     * Main 以外であること)。2 回目以降は即 return。
+     * LLM ロード + STT/TTS の遅延初期化先出し。3 エンジンとも互いに依存しないため並列実行
+     * (直列だと合計時間がかかっていた)。初回のみ数秒〜10 秒ブロック(呼び出し元は Main 以外で
+     * あること)。2 回目以降は即 return — [onEngineReady] はキャッシュヒット時は呼ばれない
+     * (先出しロードは 1 回しか走らないため)。
      */
-    suspend fun ensureInitialized() {
+    suspend fun ensureInitialized(onEngineReady: (LoadingEngine) -> Unit = {}) {
         val d = initDeferred ?: synchronized(this) {
             initDeferred ?: runtimeScope.async {
-                llm.initialize()
-                stt.warmUp()
-                ttsEngine.warmUp()
+                listOf(
+                    async { llm.initialize(); onEngineReady(LoadingEngine.LLM) },
+                    async { stt.warmUp(); onEngineReady(LoadingEngine.STT) },
+                    async { ttsEngine.warmUp(); onEngineReady(LoadingEngine.TTS) },
+                ).awaitAll()
+                Unit
             }.also { initDeferred = it }
         }
         d.await()
